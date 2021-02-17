@@ -26,6 +26,8 @@ include two metals with highly different masses (Li2TiO3).
 * Wrote the initial velocity distibution as a function
 * Wrote the configuration file creator as a function
 * Changed the mass array for LTO and included complex compounds
+* Added relavant material properties to PhysicalConstants class
+* Move unused code to oldCode
 
 16-02-21:
 * Work on initial velocity distribution
@@ -47,7 +49,14 @@ include two metals with highly different masses (Li2TiO3).
 * Add date and time to config file
 
 # To Do:
+* Add atom radii to PhysicalConstants
+* Fix number of ablated atoms and normalization of initial velocity
+    distribution
+* Get correct lattice parameters, unit cell volume, and formation energy
+    of spinel Li4Ti5O12 target
 * Check which Li, Ti, and O molecules forms in the PLD plasma plume
+* Check initial particle velocity distribution width
+
 * Check restriction values
 * Figure out the purpose of lines marked with %?%
 * Check ablation depth in target
