@@ -1,6 +1,8 @@
 # Plasma Solver v5.0.0
 Author: Tom Wijnands
+
 Modified for two metal oxides by: Bart Boonstra
+
 Reworked and modified for lithium metal oxides by: Sam Borkent
 
 Based on 'Numerical modelling of the plasma plume propagation and oxidation
@@ -77,23 +79,23 @@ include two metals with highly different masses (Li2TiO3).
 # Naming conventions:
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
 
-  lowers case : variable  (can be altered within script)
-  Camel Case  : Parameter (can be altered by user before running script)
-  UPPER CASE  : CONSTANT  (can not be altered)
-  "t"         : Time
-  "x"         : Distance
-  "rad"       : Angle
-  "n"         : Number of particles
-  "v"         : Velocity
-  "k"         : Number of collisions
-  "p"         : Pressure
-  "temp"      : Temperature
-  "e"         : Energy
-  "mo"        : Moving particles
-  "st"        : Static particles
-  "bg"        : Background gas particles
-  "col"       : Colliding particles
-  "ncol"      : NOT colliding particles 
-  "m"         : Current space matrix of all plume particles
-  "m_1"       : New space matrix of all plume particles
-  "m_bg"      : Current space matrix of all background gas particles
+  * lowers case : variable  (can be altered within script)
+  * Camel Case  : Parameter (can be altered by user before running script)
+  * UPPER CASE  : CONSTANT  (can not be altered)
+  * t         : Time
+  * x         : Distance
+  * rad       : Angle
+  * n         : Number of particles
+  * v         : Velocity
+  * k         : Number of collisions
+  * p         : Pressure
+  * temp      : Temperature
+  * e         : Energy
+  * mo        : Moving particles
+  * st        : Static particles
+  * bg        : Background gas particles
+  * col       : Colliding particles
+  * ncol      : NOT colliding particles 
+  * m         : Current space matrix of all plume particles
+  * m_1       : New space matrix of all plume particles
+  * m_bg      : Current space matrix of all background gas particles
