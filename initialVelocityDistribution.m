@@ -1,7 +1,8 @@
 function [nVelDisInit, figVelDisInit] = initialVelocityDistribution( ...
-    vel, velDisWidth, nUCAblated, nAtomsUC, massSpecies, energyLaser, ...
-    energyFormation, energyExcitation, heatTarget, adsorptionC )
+    plotBool, vel, velDisWidth, nUCAblated, nAtomsUC, massSpecies, ...
+    energyLaser, energyFormation, energyExcitation, heatTarget, adsorptionC )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
+%   plotBool            Boolean which determines if results will be plotted
 %   vel                 Velocity array
 %                           Example: [0 : (VEL_MIN / VEL_DELTA) : V_MAX]
 %   velDisWidth         Width of velocity ditribution
@@ -16,9 +17,13 @@ function [nVelDisInit, figVelDisInit] = initialVelocityDistribution( ...
 %   adsorptionC         Adsorption coefficient of the target [0 : 1]
 %
 
-
-figVelDisInit = figure;
-hold on;
+% Make plot
+if plotBool
+    figVelDisInit = figure;
+    hold on;
+    xlabel('Velocity');
+    ylabel('Number of particles');
+end
 
 % Calculate constants
 N_VEL = numel(vel);
@@ -47,7 +52,15 @@ for atom = 1 : numel(nAtomsUC)
     % Normalize velocity distribution
     nVelDisInit = nVelDisInit .* nNorm;
     
-    plot(vel, nVelDisInit);
+    % Plot results
+    if plotBool
+        plot(vel, nVelDisInit);
+    end
+end
+
+% Generate legend
+if plotBool
+    legend('Lithium', 'Titanium', 'Oxygen');
 end
 
 end
