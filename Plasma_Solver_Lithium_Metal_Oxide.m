@@ -12,26 +12,11 @@
 %   n       : Number of particles
 %   bg      : Background gas
 %   uc      : Unit cell
-%   "mo"        : Moving particles
-%   "st"        : Static particles
-%   "bg"        : Background gas
-%   "col"       : Colliding particles
-%   "ncol"      : NOT colliding particles 
-%   "m"         : Current space matrix of all plume particles
-%   "m_1"       : New space matrix of all plume particles
-%   "m_bg"      : Current space matrix of all background gas particles
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Clear workspace
-clear
-%?%clearvars -except files nn
-close all
-clc
-
-% Select execution time profiler
-%profile off
-%?%warning('OFF')
+clc, clear, close all
 
 CONSTANT = PhysicalConstants;
 
@@ -45,7 +30,6 @@ directory   = ['C:\Users\Sam\Google Drive\School\Master\Capita selecta' ...
                 '\Model_Sam\']; % Parent location
 folder      = 'SrTiO3_test';    % Output folder
 fileName    = 'config';         % Output file
-%?%SAVE_LOC    = [Dir Folder];  % Save location
 
 % Add comment to output file
 commentString = ('SrTiO3_test');
@@ -55,11 +39,6 @@ commentString = ('SrTiO3_test');
 %--------------------------------------------------------------------------
 
 plotVelDisInit  = true;           % Plot initial velocity distribution (true / false)
-% ThreeD      = false;            % Plot 3D results: true / false
-% Times_3D    = [5, 15, 20, 30];  % Times for which to generate 3D plots [s]
-%?%Arr_sum    = false;            % Calculate arriving particles:  true / false
-% Plot_1D     = false;            % Plot 1D results of middle of the plume: true / false
-% Plot_BG     = false;            % Show bg in plot: true / false
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -86,32 +65,30 @@ veloMax     = 6E4;                      % Maximal initial velocity
 veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
 
 %--------------------------------------------------------------------------
-% Simulation setting
-%--------------------------------------------------------------------------
-
-% Restrictions (Check values)
-Oxidize             = true;     %?% Enable particle oxidation (true = no oxidization)
-Dioxide             = false;    % Let particles form dioxides: true / false
-N_Local_Dist_Min    = 1;        % Minimal N per bin
-K_Max               = 7;        % Maximum k per particle
-N_Min_Rad           = 1E7;      % Minimal N per angle (angles with lower N are not computed)
-
-% Smoothing parameters
-Smooth_Fraction = 1E4;  % Fraction to smooth % ???
-Smooth_Value    = 15;   % Moving average smooth value (default: 15)
-
-%--------------------------------------------------------------------------
 % Material settings
 %--------------------------------------------------------------------------
 
-% Atomic masses
-% M_A = 87.62  * C.AMU;   % Mass Sr atom [kg]
-M_A = 6.94 * CONSTANT.AMU;     % Mass Li atom [kg]
-M_B = 47.867 * CONSTANT.AMU;   % Mass Ti atom [kg]
-M_O = 15.999 * CONSTANT.AMU;   % Mass O atom [kg]
+% Select A and B atoms
+massA = CONSTANT.MASS_Li;   % Mass Li atom [kg]
+massB = CONSTANT.MASS_Ti;   % Mass Ti atom [kg]
+massO = CONSTANT.MASS_O;    % Mass O atom [kg]
 
 % Array holding all possible plume compounds
-massSpecies = [M_A M_B M_O 2*M_O M_A+M_O M_B+M_O M_B+2*M_O 2*M_B+3*M_O]; % Sr Ti O O2 SrO TiO TiO2 Ti2O3
+massSpecies = [ massA ...               % atomic lithium        [Li +1]
+                massB ...               % atomic titanium       [Ti +4]
+                massO ...               % atomic oxygen         [O -2]
+                2*massA ...             % dilithium             [Li2 +2]
+                2*massO ...             % molecular oxygen      [O2]
+                massA + massO ...       % lithium monoxide      [LiO -1]
+                2*massA + massO ...     % lithium oxide         [Li2O]
+                2*massA + 2*massO ...   % lithium peroxide      [Li2O2 -2]
+                4*massO ...             % tetraoxygen           [O4 -4]
+                massB + massO ...       % titanium(II) oxide    [TiO +2]
+                massB + 2*massO ...     % titanium dioxide      [TiO2]
+                2*massB + massO ...     % dititanium monooxide  [Ti2O +6]
+                2*massB + 3*massO ...   % titanium(III) oxide   [Ti2O3 +2]
+                3*massB + massO         % trititanium oxide     [Ti3O +10]
+                ];
 M_NUMEL = numel(massSpecies);
 
 %?%n_A     = find(M_Array == M_A) - 1;     % place of A atom in the array

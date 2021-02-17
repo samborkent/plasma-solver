@@ -25,6 +25,7 @@ include two metals with highly different masses (Li2TiO3).
 * Changed maximum velocity to include limits of Li
 * Wrote the initial velocity distibution as a function
 * Wrote the configuration file creator as a function
+* Changed the mass array for LTO and included complex compounds
 
 16-02-21:
 * Work on initial velocity distribution
@@ -46,6 +47,7 @@ include two metals with highly different masses (Li2TiO3).
 * Add date and time to config file
 
 # To Do:
+* Check which Li, Ti, and O molecules forms in the PLD plasma plume
 * Check restriction values
 * Figure out the purpose of lines marked with %?%
 * Check ablation depth in target
@@ -56,7 +58,7 @@ include two metals with highly different masses (Li2TiO3).
 * Check angular fitting parameter
 * Check inital maximal velocity
 * Check velocity delta
-* Check with data is relevant to print in config file
+* Check which data is relevant to print in config file
 * Improve naming conventions following paper and Matlab guidelines
 * Correct inital velocity distribution ( f_i(v) )
 * Implement excitation energy
@@ -80,23 +82,8 @@ include two metals with highly different masses (Li2TiO3).
 # Naming conventions:
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
 
-* lowers case : variable  (can be altered within script)
-* Camel Case  : Parameter (can be altered by user before running script)
-* UPPER CASE  : CONSTANT  (can not be altered)
-* t         : Time
-* x         : Distance
-* rad       : Angle
+* radius    : Radius / Distance
+* velo      : Velocity
 * n         : Number of particles
-* v         : Velocity
-* k         : Number of collisions
-* p         : Pressure
-* temp      : Temperature
-* e         : Energy
-* mo        : Moving particles
-* st        : Static particles
-* bg        : Background gas particles
-* col       : Colliding particles
-* ncol      : NOT colliding particles 
-* m         : Current space matrix of all plume particles
-* m_1       : New space matrix of all plume particles
-* m_bg      : Current space matrix of all background gas particles
+* bg        : Background gas
+* uc        : Unit cell
