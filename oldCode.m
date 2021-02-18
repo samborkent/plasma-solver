@@ -64,6 +64,9 @@ E_O_high_Ti = 2.276 * CONSTANT.EV; %* Oxidize; % Upper bound oxidation energy Ti
 % Deposition settings
 %--------------------------------------------------------------------------
 
+% Background gas
+P_BG_PASCAL = 100 * bgPressure; % Convert pressure in Pa (1 mbar = 10^2 Pa)
+
 % System dimensions
 X_Ts = 0.05;    % Target-substrate distance [m]
 
@@ -71,7 +74,6 @@ X_Ts = 0.05;    % Target-substrate distance [m]
 % Initial plume settings
 %--------------------------------------------------------------------------
 
-Rad_Fit = 16;       % Radial sharpe of the plasma
 dis_NPoints =  100; % Number of datapoints in the initial velocity distribution
 
 %--------------------------------------------------------------------------

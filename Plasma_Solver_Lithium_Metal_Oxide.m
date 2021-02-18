@@ -32,13 +32,16 @@ folder      = 'SrTiO3_test';    % Output folder
 fileName    = 'config';         % Output file
 
 % Add comment to output file
-commentString = ('SrTiO3_test');
+commentString = [...
+    'Type whatever you want here. For example, this code was one of' ...
+    'the worst sturctured code I have ever seen.' ...
+    ];
 
 %--------------------------------------------------------------------------
 % Plot settings
 %--------------------------------------------------------------------------
 
-plotVelDisInit  = true;     % Plot initial velocity distribution (true / false)
+plotVelDisInit  = true; % Plot initial velocity distribution (true / false)
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -57,11 +60,11 @@ radiusDelta = 0.5E-4;   % Spatial step size [m]
 % Angular limits
 angleMin    = 0;        % Start angle [deg]
 angleMax    = 90;       % End angle [deg]
-angleDelta  = 1;        % Radial step size [deg]
+angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
 veloMin     = radiusDelta / timeDelta;  % Minimal initial velocity
-veloMax     = 6E4;                      % Maximal initial velocity
+veloMax     = 2.5E4;                     % Maximal initial velocity
 veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
 
 %--------------------------------------------------------------------------
@@ -92,106 +95,113 @@ massArray = [ massA ...               % atomic lithium        [Li +1]
             ];
 nSpecies = numel(massArray);
 
+% Atomic radii [m]
+% Assume a molecule has atomic radii of the sum of its components
+radiusA     = CONSTANT.RADIUS_Li;   % A atom: lithium
+radiusB     = CONSTANT.RADIUS_Ti;   % B atom: titanium
+radiusO     = CONSTANT.RADIUS_O;    % Oxygen atom
+radiusBG    = 2*CONSTANT.RADIUS_O;  % Background gas molecule
+
+% Collision cross section array of plume species with background gas molecule [m2]
+Sigma_Bg = (([ radiusA ...                  % A-O2
+               radiusB ...                  % B-O2
+               radiusO ...                  % O-O2
+               (radiusA + radiusO) ...      % AO-O2
+               (radiusB + radiusO) ...      % BO-O2
+               (radiusB + 2*radiusO) ...    % BO2-O2
+             ] + radiusBG).^2) .* pi;
+
 % Unit cell
-nAtomUC         = [4 5 12]; % Amount of each atom in Li4Ti5O12 unit cell [A B O]
-nAtomUCNumel    = numel(nAtomUCArray);
+nAtomUC         = [1 1 3]; % Amount of each atom in Li4Ti5O12 unit cell [A B O]
+nAtomUCNumel    = numel(nAtomUC);
 nAtomUCSum      = sum(nAtomUC);
-volumeUC        = CONSTANT.UC_VOL_Li4Ti5O12;    % Volume of Li4Ti5O12 unit cell [m3]
+ucVolume        = CONSTANT.UC_VOL_SrTiO3;    % Volume of Li4Ti5O12 unit cell [m3]
 
 % Formation energy of monoclinic Li4Ti5O12 [J] (get spinel value)
 energyFormation  = CONSTANT.UC_EF_Li4Ti5O12;
 
 % Target properties
-adsorptionC = 0.77;                         % Adsorption coefficient SrTiO3 (check value)
-heatTarget = 0;                             % No significant heat loss into the target (ceramic)
-energyExcitation = zeros(1, nAtomUCNumel);  % No significant excitation of species
-
-% Atomic radii [pm]
-% Data from: doi.org/10.1063/1.1712084
-% Assume a molecule has atomic radii of the sum of its components
-Sr_R = 219;
-Ti_R = 176;
-O_R = 48;
-
-% Collision cross section array of plume species with background gas molecule [m2]
-Sigma_Bg = (([Sr_R ...              % Sr-O2
-            Ti_R ...                % Ti-O2
-            O_R ...                 % O-O2
-            (Sr_R + O_R) ...        % SrO-O2
-            (Ti_R + O_R) ...        % TiO-O2
-            (Ti_R + 2*O_R) ...      % TiO2-O2
-            ] + 2*O_R).*(10^-12).^2) .* pi;
+adsorptionC         = 0.66;                    % Adsorption coefficient SrTiO3 (check value)
+heatTarget          = 0;                       % No significant heat loss into the target (ceramic)
+energyExcitation    = zeros(1, nAtomUCNumel);  % No significant excitation of species
 
 %--------------------------------------------------------------------------
 % Deposition settings
 %--------------------------------------------------------------------------
 
 % Background gas
-pressureBG = 0.1;  % Pressure of background gas during depostion [mbar]
-temperatureBG = 300;  % Temperature of background gas [K]
+bgPressure      = 0.1E2;    % Background gaspressure during depostion [Pa]
+bgTemperature   = 300;      % Temperature of background gas [K]
 
 % Laser parameters
-energyLaser = 0.0299;   % Laser energy [J]
-Spot_Width  = 1E-3;     % Laser spot width [m]
-Spot_Height = 2E-3;     % Laser spot height [m]
-Spot_Depth  = 100E-9;   % Ablation depth in the target [m]
+spotWidth       = 1E-3;     % Laser spot width [m]
+spotHeight      = 2.1E-3;   % Laser spot height [m]
+ablationDepth   = 100E-9;   % Ablation depth in the target [m]
+laserFluence    = 2.0;      % Laser fluence [J / cm^2]   
 
 %--------------------------------------------------------------------------
 % Initial plume settings
 %--------------------------------------------------------------------------
 
-veloDistributionWidth = 1654; % Initial particle velocity distribution width (check value)
+cosPowerFit = 25;               % Radial sharpe of the plasma (check value)
+veloDistributionWidth = 1500;   % Initial particle velocity distribution width (check value)
 
 %--------------------------------------------------------------------------
 %% Constant calculation based on parameters
 
-% Background gas
-P_BG_PASCAL = 100 * pressureBG;                       % Convert pressure in Pa (1 mbar = 10^2 Pa)
-DENSITY_BG  = P_BG_PASCAL / (CONSTANT.BOLTZMANN * temperatureBG);    % Density N/V of background gas (ideal gas law)
+% Background gas density (ideal gas law) []
+bgDensity = bgPressure / (CONSTANT.BOLTZMANN * bgTemperature);
 
-% Laser
-SPOT_VOLUME = Spot_Width * Spot_Height * Spot_Depth;    % Laser spot volume [m3]
+% Ablation volume [m3]
+ablationVolume  = spotWidth * spotHeight * ablationDepth;
+
+% Laser energy [J]
+% energyLaser = 0.0520; % Tom
+energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 
 % Unit cell
-energyBinding = nAtomUCSum * energyFormation; % Binding energy crystal (5 times formation energy per atom) [eV]
+energyBinding = energyFormation;    % Binding energy crystal [J]
 
-time = timeMin : timeDelta : timeMax;           % Temporal axis
-radius = radiusMin : radiusDelta : radiusMax;   % Radial axis
-angle = angleMin : angleDelta : angleMax;       % Angular axis
-velo = 0 : (veloMin / veloDelta) : veloMax;     % Velocity array
+% Dimensional axis
+time    = timeMin : timeDelta : timeMax;        % Temporal axis
+radius  = radiusMin : radiusDelta : radiusMax;  % Radial axis
+angle   = angleMin : angleDelta : angleMax;     % Angular axis
+velo    = 0 : (veloMin / veloDelta) : veloMax;  % Velocity array
 
-nTime = numel(time);
+% Dimensional sizes
+nTime   = numel(time);
 nRadius = numel(radius);
-nAngle = numel(angle);
-nVelo = numel(velo);
+nAngle  = numel(angle);
+nVelo   = numel(velo);
 
 %--------------------------------------------------------------------------
 %% Initial ditribution
-nUCAblated = SPOT_VOLUME / volumeUC;    % Number of ablated unit cells
-nAtomAblated = nUCAblated * nAtomUcSum; % Number of ablated atoms
+% Number of ablated unit cells
+nUCAblated = (ablationVolume / ucVolume) / nAtomUCSum; % Tom
+% nUCAblated = ablationVolume / ucVolume;
 
-n_atom_temp = zeros(nAngle - 1, 1); % Pre-allocate memory
+nParticleAngle = zeros(1, nAngle - 1); % Pre-allocate memory
 
-% Compute initial partical distribution
+% Compute initial particle distribution
 for iAngle = 1 : (nAngle - 1)
-    n_atom_temp(iAngle) = ((4/3)*pi * radiusDelta^3) .* (cosd(angle(iAngle)) ...
-        - cosd(angle(iAngle + 1))) .* cosd(angle(iAngle)).^Rad_Fit;
+    nParticleAngle(iAngle) = ((4/3)*pi * radiusDelta^3) .* (cosd(angle(iAngle)) ...
+        - cosd(angle(iAngle + 1))) .* cosd(angle(iAngle)).^cosPowerFit; %?%
 end
 
 % Number of atoms per angle
-n_atom_rad = (n_atom_temp .* nUCAblated) ./ sum(n_atom_temp); %?%
+nParticleAngle = (nParticleAngle .* nUCAblated) ./ sum(nParticleAngle); %?%
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
-
 createConfigFile( directory, folder, fileName, commentString, time, ...
-    radius, angle, velo, pressureBG );
+    radius, angle, velo, bgPressure );
 
 %--------------------------------------------------------------------------
 %% Calculate the initial particle velocity distribution
-nVelDisInit = initialVelocityDistribution( plotVelDisInit, velo, ...
-    veloDistributionWidth, nUCAblated, nAtomUCArray, massArray, energyLaser, ...
-    energyFormation, energyExcitation, heatTarget, adsorptionC );
+nVeloDistributionInitial = initialVelocityDistribution( plotVelDisInit, ...
+    velo, veloDistributionWidth, nUCAblated, nAtomUC, massArray, ...
+    energyLaser, energyFormation, energyExcitation, heatTarget, ...
+    adsorptionC, nParticleAngle(2) );
 
 %--------------------------------------------------------------------------
 %% Main program

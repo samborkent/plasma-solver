@@ -1,6 +1,7 @@
 function [nVelDisInit, figVelDisInit] = initialVelocityDistribution( ...
-    plotBool, vel, velDisWidth, nUCAblated, nAtomsUC, massSpecies, ...
-    energyLaser, energyFormation, energyExcitation, heatTarget, adsorptionC )
+    plotBool, velocity, velDisWidth, nUCAblated, nAtomUC, massSpecies, ...
+    energyLaser, energyBinding, energyExcitation, heatTarget, ... 
+    adsorptionC, nParticleAngle )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
 %   plotBool            Boolean which determines if results will be plotted
 %   vel                 Velocity array
@@ -21,46 +22,49 @@ function [nVelDisInit, figVelDisInit] = initialVelocityDistribution( ...
 if plotBool
     figVelDisInit = figure;
     hold on;
-    xlabel('Velocity');
+    xlabel('Velocity [m/s]');
     ylabel('Number of particles');
 end
 
 % Calculate constants
-N_VEL = numel(vel);
+nVelocity = numel(velocity);
 
 % Pre-allocate
-nVelDisInit = zeros(1, N_VEL);
+nVelDisInit = zeros(1, nVelocity);
 
-for atom = 1 : numel(nAtomsUC)
+for atom = 1 : numel(nAtomUC)
     % Initial kinetic energy of species (eq. 1)
-    energyKinetic = (((energyLaser / adsorptionC) - ...
-        heatTarget) / nUCAblated) - energyFormation - ...
-        energyExcitation(atom);
+%     energyKinetic = (((energyLaser / adsorptionC) - heatTarget) ...
+%         / nUCAblated) - energyBinding - energyExcitation(atom);
     
     % Initial average velocity
-    velAvgInit = sqrt(2 * energyKinetic / massSpecies(atom));
+%     velocityAverage = sqrt(2 * energyKinetic / massSpecies(atom));
+    velocityAverage = sqrt( ( (energyLaser * 0.9 * adsorptionC) / 3 / ...
+        nUCAblated - energyBinding) / 2 / massSpecies(atom));
     
-    for i = 1 : N_VEL
+    for i = 1 : nVelocity
         % Initial particle distibution per velocity (eq. 3)
-        nVelDisInit(i) = exp(-(vel(i) - velAvgInit)^2 / ...
+        nVelDisInit(i) = exp(-(velocity(i) - velocityAverage)^2 / ...
             (2 * velDisWidth^2)) / (velDisWidth * sqrt(2 * pi));
     end
     
     % Normalization factor
-    nNorm = (nUCAblated * nAtomsUC(atom)) / sum(nVelDisInit);
-    
+%     nNorm = (nParticleAngle * nAtomUC(atom)) / sum(nVelDisInit);
+    nNorm = nParticleAngle * (nAtomUC(atom) / sum(nAtomUC)) / sum(nVelDisInit);
+ 
     % Normalize velocity distribution
     nVelDisInit = nVelDisInit .* nNorm;
     
     % Plot results
     if plotBool
-        plot(vel, nVelDisInit);
+        plot(velocity, nVelDisInit);
     end
 end
 
 % Generate legend
 if plotBool
-    legend('Lithium', 'Titanium', 'Oxygen');
+    legend('Strontium', 'Titanium', 'Oxygen');
+    set(findobj('Type','line'), 'LineWidth', 3)
 end
 
 end

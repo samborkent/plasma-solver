@@ -14,9 +14,15 @@ plasma plume in 3D as result of ablation of a single crystal TiO2 target,
 initial ablation is not included. Modified by Bart Boonstra to improve
 performance and extended to include two metals (SrTiO3). Refactored and
 extended by Sam Borkent to improve readability and performance and to
-include two metals with highly different masses (Li2TiO3).
+include two metals with highly different masses (Li4Ti5O12).
 
 # Change log:
+
+18-02-21:
+* Added added atomic radii and Mn to PhysicalConstants
+* Added laser fluence variable
+* Fixed initial velocity distribution to reproduce results of paper
+* Added notes where the there is a discrepancy between paper and script
 
 17-02-21:
 * Edited to include Git support
@@ -49,14 +55,12 @@ include two metals with highly different masses (Li2TiO3).
 * Add date and time to config file
 
 # To Do:
-* Add atom radii to PhysicalConstants
-* Fix number of ablated atoms and normalization of initial velocity
-    distribution
+* Fix problem where velocity distribution shifts to the right if the number
+    of atoms in the unit cell are increased (probably velocityAverage)
 * Get correct lattice parameters, unit cell volume, and formation energy
     of spinel Li4Ti5O12 target
 * Check which Li, Ti, and O molecules forms in the PLD plasma plume
 * Check initial particle velocity distribution width
-
 * Check restriction values
 * Figure out the purpose of lines marked with %?%
 * Check ablation depth in target
@@ -68,25 +72,20 @@ include two metals with highly different masses (Li2TiO3).
 * Check inital maximal velocity
 * Check velocity delta
 * Check which data is relevant to print in config file
-* Improve naming conventions following paper and Matlab guidelines
-* Correct inital velocity distribution ( f_i(v) )
 * Implement excitation energy
 
 # Questions:
 * Why is the crystal binding energy 5x the formation energy?
-* It says that is 'Oxidation' is set to 1 (true) there is no oxidation
-  possible, is this correct?
 * What is the target density, and why is it 1?
 * Why are O2 and Ti2O3 not included in mass array?
 * Why is only the activation energy of TiO listed, and not of SrO or
   O2?
-* What do the three constants in the initial plume settings block do?
 * Why clear variables from memory within loop, instead of overwriting?
 * Where does the 0.9 come from in Tom's average velocity?
 * Why is the average velocity twice divided by the number of atoms in
   the unit cell?
-* V_Delta is experimentally fitted according to the paper, but is
-  exactly 5?
+* Why is the total number of ablated unit cells divided by the number of
+    atoms in the unit cell?
 
 # Naming conventions:
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
@@ -96,3 +95,9 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
 * n         : Number of particles
 * bg        : Background gas
 * uc        : Unit cell
+
+# Assumptions
+* The target material is completely oxidized. Most oxide targets are 
+    specified with a variable amount of oxygen in the unit cell (e.g.
+    SrTiOx). This model assumes no oxygen vacancies or excess in the
+    target. (e.g. SrTiO3, Li4Ti5O12)
