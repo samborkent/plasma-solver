@@ -10,24 +10,7 @@ classdef PhysicalConstants
         %% SI conversion constants
         AMU = 1.66053906660E-27;        % Atomic mass unit [kg]
         EV  = 1.602176634E-19;          % Electron volt [J]
-        
-        %% Atomic masses [kg]
-        % Source: Google search info sheet (replace with real source)
-        MASS_Li = 6.941     * PhysicalConstants.AMU;    % Lithium
-        MASS_O  = 15.999    * PhysicalConstants.AMU;    % Oxygen
-        MASS_Ar = 39.948    * PhysicalConstants.AMU;    % Argon
-        MASS_Ti = 47.867    * PhysicalConstants.AMU;    % Titanium
-        MASS_Mn = 54.938    * PhysicalConstants.AMU;    % Manganese
-        MASS_Sr = 87.62     * PhysicalConstants.AMU;    % Strontium
-        
-        %% Atomic radii [m]
-        % Source: https://doi.org/10.1063/1.1712084
-        RADIUS_Li   = 167E-12;  % Lithium
-        RADIUS_O    = 48E-12;   % Oxygen
-        RADIUS_Ar   = 71E-12;   % Argon
-        RADIUS_Ti   = 176E-12;  % Titanium
-        RADIUS_Mn   = 161E-12;  % Manganese
-        RADIUS_Sr   = 219E-12;  % Strontium
+        HA  = 4.3597447222071E-18;      % Hatree [J]
       
         %% Unit cell volumes [m]
         % TiO2, tetragonal => a^2 * c
@@ -43,7 +26,7 @@ classdef PhysicalConstants
         % Li4Ti5O12, cubic => a^3
         % Source: "Doubling Reversible Capacities in Epitaxial Li4Ti5O12
         %   Thin Film Anodes for Microbatteries", 2019, D.M. Cunha et al.
-        UC_VOL_Li4_8Ti5O12 = (8.36E-10)^3;
+        UC_VOL_Li4Ti5O12 = (8.36E-10)^3;
         
         %% Unit cell formation energies [J]
         % Source: https://materialsproject.org/materials/mp-....../
@@ -55,4 +38,3 @@ classdef PhysicalConstants
         UC_EF_Li4Ti5O12 = 3.2 * PhysicalConstants.EV;
     end
 end
-

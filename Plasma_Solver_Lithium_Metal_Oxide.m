@@ -19,6 +19,7 @@
 clc, clear, close all
 
 CONSTANT = PhysicalConstants;
+PT = PeriodicTable;
 
 %% Initial conditions
 %--------------------------------------------------------------------------
@@ -64,17 +65,24 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
 veloMin     = radiusDelta / timeDelta;  % Minimal initial velocity
-veloMax     = 2.5E4;                     % Maximal initial velocity
+veloMax     = 20E4;                     % Maximal initial velocity
 veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
 
 %--------------------------------------------------------------------------
 % Material settings
 %--------------------------------------------------------------------------
 
-% Select A and B atoms
-massA = CONSTANT.MASS_Li;   % Mass Li atom [kg]
-massB = CONSTANT.MASS_Ti;   % Mass Ti atom [kg]
-massO = CONSTANT.MASS_O;    % Mass O atom [kg]
+% Unit cell
+atomUC          = [PT.Li PT.Ti PT.O];   % Atoms in unit cell
+nAtomUC         = [4.8 5 12];              % Amount of each atom in unit cell [A B O]
+nAtomUCNumel    = numel(nAtomUC);
+nAtomUCSum      = sum(nAtomUC);
+ucVolume        = CONSTANT.UC_VOL_Li4Ti5O12; % Volume of Li4Ti5O12 unit cell [m3]
+
+% Select A and B atoms  
+massA = atomUC(1).MASS;     % Mass A atom [kg]
+massB = atomUC(2).MASS;     % Mass B atom [kg]
+massO = atomUC(3).MASS;     % Mass O atom [kg]
 
 % Array holding all possible plume compounds
 massArray = [ massA ...               % atomic lithium        [Li +1]
@@ -97,10 +105,10 @@ nSpecies = numel(massArray);
 
 % Atomic radii [m]
 % Assume a molecule has atomic radii of the sum of its components
-radiusA     = CONSTANT.RADIUS_Li;   % A atom: lithium
-radiusB     = CONSTANT.RADIUS_Ti;   % B atom: titanium
-radiusO     = CONSTANT.RADIUS_O;    % Oxygen atom
-radiusBG    = 2*CONSTANT.RADIUS_O;  % Background gas molecule
+radiusA     = atomUC(1).MASS;   % A atom: lithium
+radiusB     = atomUC(2).MASS;   % B atom: titanium
+radiusO     = atomUC(3).MASS;   % Oxygen atom
+radiusBG    = 2*PT.O.RADIUS;    % Background gas molecule
 
 % Collision cross section array of plume species with background gas molecule [m2]
 Sigma_Bg = (([ radiusA ...                  % A-O2
@@ -110,12 +118,6 @@ Sigma_Bg = (([ radiusA ...                  % A-O2
                (radiusB + radiusO) ...      % BO-O2
                (radiusB + 2*radiusO) ...    % BO2-O2
              ] + radiusBG).^2) .* pi;
-
-% Unit cell
-nAtomUC         = [1 1 3]; % Amount of each atom in Li4Ti5O12 unit cell [A B O]
-nAtomUCNumel    = numel(nAtomUC);
-nAtomUCSum      = sum(nAtomUC);
-ucVolume        = CONSTANT.UC_VOL_SrTiO3;    % Volume of Li4Ti5O12 unit cell [m3]
 
 % Formation energy of monoclinic Li4Ti5O12 [J] (get spinel value)
 energyFormation  = CONSTANT.UC_EF_Li4Ti5O12;
@@ -177,19 +179,23 @@ nVelo   = numel(velo);
 %--------------------------------------------------------------------------
 %% Initial ditribution
 % Number of ablated unit cells
-nUCAblated = (ablationVolume / ucVolume) / nAtomUCSum; % Tom
-% nUCAblated = ablationVolume / ucVolume;
+% nUCAblated = (ablationVolume / ucVolume) / nAtomUCSum; % Tom
+nUCAblated = ablationVolume / ucVolume; % Number of ablated unit cells
+nAtomAblated = nUCAblated * nAtomUCSum; % Number of ablated atoms
 
-nParticleAngle = zeros(1, nAngle - 1); % Pre-allocate memory
+% Pre-allocate memory
+nParticleAngle = zeros(1, nAngle - 1);
 
-% Compute initial particle distribution
+% Compute initial angular particle distribution
 for iAngle = 1 : (nAngle - 1)
-    nParticleAngle(iAngle) = ((4/3)*pi * radiusDelta^3) .* (cosd(angle(iAngle)) ...
-        - cosd(angle(iAngle + 1))) .* cosd(angle(iAngle)).^cosPowerFit; %?%
+    nParticleAngle(iAngle) = ((4/3)*pi * radiusDelta^3) .* ...
+        (cosd(angle(iAngle)) - cosd(angle(iAngle + 1))) .* ...
+        cosd(angle(iAngle)).^cosPowerFit; %?%
 end
 
-% Number of atoms per angle
-nParticleAngle = (nParticleAngle .* nUCAblated) ./ sum(nParticleAngle); %?%
+% Normalize and multiply by the total number of ablated atoms
+nParticleAngle = (nParticleAngle .* nAtomAblated) ...
+                    ./ sum(nParticleAngle);
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
@@ -198,13 +204,14 @@ createConfigFile( directory, folder, fileName, commentString, time, ...
 
 %--------------------------------------------------------------------------
 %% Calculate the initial particle velocity distribution
-nVeloDistributionInitial = initialVelocityDistribution( plotVelDisInit, ...
-    velo, veloDistributionWidth, nUCAblated, nAtomUC, massArray, ...
-    energyLaser, energyFormation, energyExcitation, heatTarget, ...
-    adsorptionC, nParticleAngle(2) );
+[nVeloDistributionInitial, E_k] = initialVelocityDistribution( plotVelDisInit, ...
+    velo, veloDistributionWidth, nUCAblated, atomUC, nAtomUC, ...
+    energyLaser, energyBinding, heatTarget, adsorptionC, nParticleAngle(2) );
 
 %--------------------------------------------------------------------------
 %% Main program
+
+E_k = E_k / CONSTANT.EV;
 
 % for theta = 1 : 1 %(numel(rad) - 1)
 %     % Initiate

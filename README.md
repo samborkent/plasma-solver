@@ -18,6 +18,13 @@ include two metals with highly different masses (Li4Ti5O12).
 
 # Change log:
 
+19-02-21:
+* Added Atom class holding Atom properties, added PeriodicTable class
+    holding all atoms
+* Improved kinetic energy term in initialVelocityDistribution and added
+    excitation energy
+* Multiplied nParticleAngle by number of atoms in unit cell
+
 18-02-21:
 * Added added atomic radii and Mn to PhysicalConstants
 * Added laser fluence variable
@@ -57,9 +64,9 @@ include two metals with highly different masses (Li4Ti5O12).
 # To Do:
 * Fix problem where velocity distribution shifts to the right if the number
     of atoms in the unit cell are increased (probably velocityAverage)
-* Get correct lattice parameters, unit cell volume, and formation energy
-    of spinel Li4Ti5O12 target
+* Get correct formation energy of cubic spinel Li4Ti5O12 target
 * Check which Li, Ti, and O molecules forms in the PLD plasma plume
+
 * Check initial particle velocity distribution width
 * Check restriction values
 * Figure out the purpose of lines marked with %?%
@@ -72,7 +79,6 @@ include two metals with highly different masses (Li4Ti5O12).
 * Check inital maximal velocity
 * Check velocity delta
 * Check which data is relevant to print in config file
-* Implement excitation energy
 
 # Questions:
 * Why is the crystal binding energy 5x the formation energy?
