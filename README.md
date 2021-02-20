@@ -18,6 +18,11 @@ include two metals with highly different masses (Li4Ti5O12).
 
 # Change log:
 
+20-02-21:
+* Edited initialVelocityDistribution to try to fix of shift with increaed
+    atoms
+* Made Material class, and UnitCells class to hold all material properties
+
 19-02-21:
 * Added Atom class holding Atom properties, added PeriodicTable class
     holding all atoms

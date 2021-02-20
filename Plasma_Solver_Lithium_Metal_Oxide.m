@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 
 % Naming conventions:
-% Loosly resemble paper names and follow MATLAB style guidelines v1.3
+%   Loosly resemble paper names and follow MATLAB style guidelines v1.3
 %
 %   radius  : Radius / Distance
 %   velo    : Velocity
@@ -20,6 +20,7 @@ clc, clear, close all
 
 CONSTANT = PhysicalConstants;
 PT = PeriodicTable;
+UC = UnitCells;
 
 %% Initial conditions
 %--------------------------------------------------------------------------
@@ -34,8 +35,8 @@ fileName    = 'config';         % Output file
 
 % Add comment to output file
 commentString = [...
-    'Type whatever you want here. For example, this code was one of' ...
-    'the worst sturctured code I have ever seen.' ...
+    'Type whatever you want here. For example, this code was one ' ...
+    'of the worst sturctured code I have ever seen.' ...
     ];
 
 %--------------------------------------------------------------------------
@@ -65,19 +66,21 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
 veloMin     = radiusDelta / timeDelta;  % Minimal initial velocity
-veloMax     = 20E4;                     % Maximal initial velocity
-veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
+veloMax     = 20E4;                      % Maximal initial velocity
+veloDelta   = 100;
+% veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
 
 %--------------------------------------------------------------------------
 % Material settings
 %--------------------------------------------------------------------------
 
 % Unit cell
+uc              = UC.Li4Ti5O12;
 atomUC          = [PT.Li PT.Ti PT.O];   % Atoms in unit cell
-nAtomUC         = [4.8 5 12];              % Amount of each atom in unit cell [A B O]
+nAtomUC         = [4 5 12];              % Amount of each atom in unit cell [A B O]
 nAtomUCNumel    = numel(nAtomUC);
 nAtomUCSum      = sum(nAtomUC);
-ucVolume        = CONSTANT.UC_VOL_Li4Ti5O12; % Volume of Li4Ti5O12 unit cell [m3]
+ucVolume        = uc.VOLUME;            % Volume of unit cell [m^3]
 
 % Select A and B atoms  
 massA = atomUC(1).MASS;     % Mass A atom [kg]
@@ -120,12 +123,11 @@ Sigma_Bg = (([ radiusA ...                  % A-O2
              ] + radiusBG).^2) .* pi;
 
 % Formation energy of monoclinic Li4Ti5O12 [J] (get spinel value)
-energyFormation  = CONSTANT.UC_EF_Li4Ti5O12;
+energyFormation  = uc.ENERGY_FORMATION;
 
 % Target properties
 adsorptionC         = 0.66;                    % Adsorption coefficient SrTiO3 (check value)
 heatTarget          = 0;                       % No significant heat loss into the target (ceramic)
-energyExcitation    = zeros(1, nAtomUCNumel);  % No significant excitation of species
 
 %--------------------------------------------------------------------------
 % Deposition settings
@@ -165,10 +167,11 @@ energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 energyBinding = energyFormation;    % Binding energy crystal [J]
 
 % Dimensional axis
-time    = timeMin : timeDelta : timeMax;        % Temporal axis
-radius  = radiusMin : radiusDelta : radiusMax;  % Radial axis
-angle   = angleMin : angleDelta : angleMax;     % Angular axis
-velo    = 0 : (veloMin / veloDelta) : veloMax;  % Velocity array
+time    = timeMin               : timeDelta     : timeMax;      % Temporal axis
+radius  = radiusMin             : radiusDelta   : radiusMax;    % Radial axis
+angle   = angleMin + angleDelta : angleDelta    : angleMax;     % Angular axis
+velo    = veloMin               : veloDelta     : veloMax;      % Velocity array
+% velo  = 0 : (veloMin / veloDelta) : veloMax;
 
 % Dimensional sizes
 nTime   = numel(time);

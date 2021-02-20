@@ -23,6 +23,7 @@ if plotBool
     hold on;
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');
+    xlim([min(velocity) max(velocity)]);
 end
 
 % Calculate constants
@@ -31,13 +32,16 @@ nVelocity = numel(velocity);
 % Pre-allocate
 nVelDisInit = zeros(1, nVelocity);
 
-% Initial kinetic energy of atoms (eq. 1)
-energyKinetic = (((energyLaser / adsorptionC) - heatTarget) ...
-                / nUCAblated) - energyBinding - atomUC(1).ENERGY_FI ...
-                - atomUC(2).ENERGY_FI - atomUC(3).ENERGY_FI;
+% Initial total energy of atoms (kinetic plus excitation) (eq. 1)
+energyTotal = (((energyLaser / adsorptionC) - heatTarget) ...
+                / nUCAblated) - energyBinding;
 
 for atom = 1 : numel(nAtomUC)
-    if (nAtomUC(atom) > 0)       
+    if (nAtomUC(atom) > 0)
+        % Inital kinetic energy of atoms
+%         energyKinetic = energyTotal - atomUC(atom).ENERGY_FI;
+        energyKinetic = energyTotal;
+        
         % Initial average velocity
         velocityAverage = sqrt(2 * energyKinetic / atomUC(atom).MASS);
 %         velocityAverage = sqrt( ( (energyLaser * 0.9 * adsorptionC) / 3 / ...
