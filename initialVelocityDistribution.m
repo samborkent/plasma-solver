@@ -1,6 +1,6 @@
 function [nVelDisInit, energyKinetic, figVelDisInit] = initialVelocityDistribution( ...
-    plotBool, velocity, velDisWidth, nUCAblated, atomUC, nAtomUC, ...
-    energyLaser, energyBinding, heatTarget, adsorptionC, nParticleAngle )
+    plotBool, saveBool, velocity, velDisWidth, nUCAblated, uc, ...
+    energyLaser, energyBinding, heatTarget, absorption, nParticleAngle )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
 %   plotBool            Boolean which determines if results will be plotted
 %   vel                 Velocity array
@@ -11,37 +11,36 @@ function [nVelDisInit, energyKinetic, figVelDisInit] = initialVelocityDistributi
 %                           Example: [2 1 3] for Li2TiO3
 %   massAtoms           Array with the mass of the atoms in the unit cell
 %   energyLaser         Laser energy [J]
-%   energyFormation     Formation energy of unit cell [J]
-%   energyExcitation    Excitation energy array of atoms in unit cell [J]
+%   energyBinding       Binding energy of unit cell [J]
 %   heatTarget          Heat loss into the target [J]
-%   adsorptionC         Adsorption coefficient of the target [0 : 1]
+%   adsorption          Adsorption coefficient of the target [0 : 1]
 %
 
 % Make plot
 if plotBool
     figVelDisInit = figure;
     hold on;
+    title(uc.FORMULA);
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');
     xlim([min(velocity) max(velocity)]);
+    ylim([0 2.5E13]);
 end
 
-% Calculate constants
-nVelocity = numel(velocity);
+% Get constants
+nVelocity   = numel(velocity);
+atomUC      = uc.ELEMENTS;
+nAtomUC     = uc.AMOUNT;
 
 % Pre-allocate
 nVelDisInit = zeros(1, nVelocity);
 
-% Initial total energy of atoms (kinetic plus excitation) (eq. 1)
-energyTotal = (((energyLaser / adsorptionC) - heatTarget) ...
-                / nUCAblated) - energyBinding;
+% Initial kinetic energy of atoms (excitation is neglected) (eq. 1)
+energyKinetic = ((((energyLaser * absorption) - heatTarget) ...
+                / nUCAblated) - energyBinding) / sum(nAtomUC);
 
-for atom = 1 : numel(nAtomUC)
-    if (nAtomUC(atom) > 0)
-        % Inital kinetic energy of atoms
-%         energyKinetic = energyTotal - atomUC(atom).ENERGY_FI;
-        energyKinetic = energyTotal;
-        
+for atom = numel(nAtomUC) : -1 : 1
+    if (nAtomUC(atom) > 0)       
         % Initial average velocity
         velocityAverage = sqrt(2 * energyKinetic / atomUC(atom).MASS);
 %         velocityAverage = sqrt( ( (energyLaser * 0.9 * adsorptionC) / 3 / ...
@@ -54,8 +53,8 @@ for atom = 1 : numel(nAtomUC)
         end
 
         % Normalization factor
-    %     nNorm = (nParticleAngle * nAtomUC(atom)) / sum(nVelDisInit);
-        nNorm = nParticleAngle * (nAtomUC(atom) / sum(nAtomUC)) / sum(nVelDisInit);
+        nNorm = (nParticleAngle * (nAtomUC(atom) / sum(nAtomUC))) ...
+                    / sum(nVelDisInit);
 
         % Normalize velocity distribution
         nVelDisInit = nVelDisInit .* nNorm;
@@ -71,6 +70,11 @@ end
 if plotBool
     legend;
     set(findobj('Type','line'), 'LineWidth', 3)
+    
+    % Save figure
+    if saveBool
+        saveas(figVelDisInit, [uc.FORMULA '1.png']);
+    end
 end
 
 end

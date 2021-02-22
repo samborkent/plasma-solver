@@ -16,7 +16,28 @@ performance and extended to include two metals (SrTiO3). Refactored and
 extended by Sam Borkent to improve readability and performance and to
 include two metals with highly different masses (Li4Ti5O12).
 
-# Change log:
+# Assumptions
+* The target material is completely oxidized. Most oxide targets are 
+    specified with a variable amount of oxygen in the unit cell (e.g.
+    SrTiOx). This model assumes no oxygen vacancies or excess in the
+    target. (e.g. SrTiO3, Li4Ti5O12)
+* The excitation energy of the atoms in the unit cell are neglected
+
+# Naming conventions
+Loosly resemble paper names and follow MATLAB style guidelines v1.3
+
+* radius    : Radius / Distance
+* velo      : Velocity
+* n         : Number of particles
+* bg        : Background gas
+* uc        : Unit cell
+
+# Change log
+22-02-21:
+* Added amount array and number of atoms property to Material, replaced
+    elements string for PeriodicTable reference
+* Fixed issue where velocity changes with number of atoms. Number of atoms
+    still factor 10 to high
 
 20-02-21:
 * Edited initialVelocityDistribution to try to fix of shift with increaed
@@ -66,26 +87,24 @@ include two metals with highly different masses (Li4Ti5O12).
 * Made make dir conditional so it is skipped if dir already exists
 * Add date and time to config file
 
-# To Do:
-* Fix problem where velocity distribution shifts to the right if the number
-    of atoms in the unit cell are increased (probably velocityAverage)
+# Issues
+* Number of particles in initialVelocityDistribution is
+    a factor 10 too high
+
+# To do
 * Get correct formation energy of cubic spinel Li4Ti5O12 target
 * Check which Li, Ti, and O molecules forms in the PLD plasma plume
-
 * Check initial particle velocity distribution width
 * Check restriction values
-* Figure out the purpose of lines marked with %?%
 * Check ablation depth in target
-* Check adsorption coefficient value (Temp and photon energy dependend)
+* Check absorption coefficient value (Temp and photon energy dependend)
 * Check crystal binding energy
 * Check activation energies
 * Check oxidation energies
 * Check angular fitting parameter
-* Check inital maximal velocity
-* Check velocity delta
 * Check which data is relevant to print in config file
 
-# Questions:
+# Questions
 * Why is the crystal binding energy 5x the formation energy?
 * What is the target density, and why is it 1?
 * Why are O2 and Ti2O3 not included in mass array?
@@ -97,18 +116,3 @@ include two metals with highly different masses (Li4Ti5O12).
   the unit cell?
 * Why is the total number of ablated unit cells divided by the number of
     atoms in the unit cell?
-
-# Naming conventions:
-Loosly resemble paper names and follow MATLAB style guidelines v1.3
-
-* radius    : Radius / Distance
-* velo      : Velocity
-* n         : Number of particles
-* bg        : Background gas
-* uc        : Unit cell
-
-# Assumptions
-* The target material is completely oxidized. Most oxide targets are 
-    specified with a variable amount of oxygen in the unit cell (e.g.
-    SrTiOx). This model assumes no oxygen vacancies or excess in the
-    target. (e.g. SrTiO3, Li4Ti5O12)

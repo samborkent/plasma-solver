@@ -44,6 +44,13 @@ commentString = [...
 %--------------------------------------------------------------------------
 
 plotVelDisInit  = true; % Plot initial velocity distribution (true / false)
+saveVelDisInit  = true; % Save the initial velocity distribution plot (true / false)
+
+%--------------------------------------------------------------------------
+% Plot settings
+%--------------------------------------------------------------------------
+
+nMinAngle       = 1;
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -66,26 +73,26 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
 veloMin     = radiusDelta / timeDelta;  % Minimal initial velocity
-veloMax     = 20E4;                      % Maximal initial velocity
+veloMax     = 3E4;                      % Maximal initial velocity
 veloDelta   = 100;
-% veloDelta   = 5;                        % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
+% veloDelta   = 5;                      % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
 
 %--------------------------------------------------------------------------
 % Material settings
 %--------------------------------------------------------------------------
 
 % Unit cell
-uc              = UC.Li4Ti5O12;
-atomUC          = [PT.Li PT.Ti PT.O];   % Atoms in unit cell
-nAtomUC         = [4 5 12];              % Amount of each atom in unit cell [A B O]
+uc              = UC.Li4Ti5O12;  
+atomUC          = uc.ELEMENTS;      % Atoms in unit cell
+nAtomUC         = uc.AMOUNT;        % Amount of each atom in unit cell [A B O]
 nAtomUCNumel    = numel(nAtomUC);
 nAtomUCSum      = sum(nAtomUC);
-ucVolume        = uc.VOLUME;            % Volume of unit cell [m^3]
+ucVolume        = uc.VOLUME;        % Volume of unit cell [m^3]
 
 % Select A and B atoms  
 massA = atomUC(1).MASS;     % Mass A atom [kg]
 massB = atomUC(2).MASS;     % Mass B atom [kg]
-massO = atomUC(3).MASS;     % Mass O atom [kg]
+massO = atomUC(end).MASS;   % Mass O atom [kg]
 
 % Array holding all possible plume compounds
 massArray = [ massA ...               % atomic lithium        [Li +1]
@@ -110,7 +117,7 @@ nSpecies = numel(massArray);
 % Assume a molecule has atomic radii of the sum of its components
 radiusA     = atomUC(1).MASS;   % A atom: lithium
 radiusB     = atomUC(2).MASS;   % B atom: titanium
-radiusO     = atomUC(3).MASS;   % Oxygen atom
+radiusO     = atomUC(end).MASS; % Oxygen atom
 radiusBG    = 2*PT.O.RADIUS;    % Background gas molecule
 
 % Collision cross section array of plume species with background gas molecule [m2]
@@ -126,8 +133,8 @@ Sigma_Bg = (([ radiusA ...                  % A-O2
 energyFormation  = uc.ENERGY_FORMATION;
 
 % Target properties
-adsorptionC         = 0.66;                    % Adsorption coefficient SrTiO3 (check value)
-heatTarget          = 0;                       % No significant heat loss into the target (ceramic)
+absorption          = 0.66; % Adsorption coefficient SrTiO3 (check value)
+heatTarget          = 0;    % No significant heat loss into the target (ceramic)
 
 %--------------------------------------------------------------------------
 % Deposition settings
@@ -153,10 +160,10 @@ veloDistributionWidth = 1500;   % Initial particle velocity distribution width (
 %--------------------------------------------------------------------------
 %% Constant calculation based on parameters
 
-% Background gas density (ideal gas law) []
+% Background gas density (ideal gas law) 
 bgDensity = bgPressure / (CONSTANT.BOLTZMANN * bgTemperature);
 
-% Ablation volume [m3]
+% Ablation volume [m^3]
 ablationVolume  = spotWidth * spotHeight * ablationDepth;
 
 % Laser energy [J]
@@ -183,8 +190,8 @@ nVelo   = numel(velo);
 %% Initial ditribution
 % Number of ablated unit cells
 % nUCAblated = (ablationVolume / ucVolume) / nAtomUCSum; % Tom
-nUCAblated = ablationVolume / ucVolume; % Number of ablated unit cells
-nAtomAblated = nUCAblated * nAtomUCSum; % Number of ablated atoms
+nUCAblated      = ablationVolume / ucVolume;    % Number of ablated unit cells
+nAtomAblated    = nUCAblated * nAtomUCSum;      % Number of ablated atoms
 
 % Pre-allocate memory
 nParticleAngle = zeros(1, nAngle - 1);
@@ -197,8 +204,7 @@ for iAngle = 1 : (nAngle - 1)
 end
 
 % Normalize and multiply by the total number of ablated atoms
-nParticleAngle = (nParticleAngle .* nAtomAblated) ...
-                    ./ sum(nParticleAngle);
+nParticleAngle = (nParticleAngle .* nAtomAblated) ./ sum(nParticleAngle);
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
@@ -208,20 +214,18 @@ createConfigFile( directory, folder, fileName, commentString, time, ...
 %--------------------------------------------------------------------------
 %% Calculate the initial particle velocity distribution
 [nVeloDistributionInitial, E_k] = initialVelocityDistribution( plotVelDisInit, ...
-    velo, veloDistributionWidth, nUCAblated, atomUC, nAtomUC, ...
-    energyLaser, energyBinding, heatTarget, adsorptionC, nParticleAngle(2) );
+    saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
+    energyLaser, energyBinding, heatTarget, absorption, nParticleAngle(1) );
 
 %--------------------------------------------------------------------------
 %% Main program
 
-E_k = E_k / CONSTANT.EV;
-
-% for theta = 1 : 1 %(numel(rad) - 1)
-%     % Initiate
-%     n_atom = 1;
-%     
-%     % Number of atoms at current angle
-%     if n_atom_rad(theta) > N_Min_Rad
-%         n_atom = n_atom_rad(theta);
-%     end
-% end
+for theta = 1 : 1 %(numel(rad) - 1)
+    % Initiate
+    nAtom = 1;
+    
+    % Number of atoms at current angle
+    if nParticleAngle(theta) > nMinAngle
+        nAtom = nParticleAngle(theta);
+    end
+end

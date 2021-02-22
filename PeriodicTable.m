@@ -2,7 +2,7 @@ classdef PeriodicTable
     %PERIODICTABLE Class holding atomic properties
     % Source: PTable.com
     
-    properties
+    properties (Constant)
         % Lithium
         Li  = Atom( 3, ...                                  % Atomic number
                     'Li', ...                               % Symbol
