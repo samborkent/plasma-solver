@@ -1,4 +1,4 @@
-function [nVelDisInit, energyKinetic, figVelDisInit] = initialVelocityDistribution( ...
+function [velocityDistributionInitial, figVelDisInit] = initialVelocityDistribution( ...
     plotBool, saveBool, velocity, velDisWidth, nUCAblated, uc, ...
     energyLaser, energyBinding, heatTarget, absorption, nParticleAngle )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
@@ -23,8 +23,8 @@ if plotBool
     title(uc.FORMULA);
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');
-    xlim([min(velocity) max(velocity)]);
-    ylim([0 2.5E13]);
+%     xlim([0 max(velocity)]);
+%     ylim([0 2.5E13]);
 end
 
 % Get constants
@@ -33,7 +33,7 @@ atomUC      = uc.ELEMENTS;
 nAtomUC     = uc.AMOUNT;
 
 % Pre-allocate
-nVelDisInit = zeros(1, nVelocity);
+velocityDistributionInitial = zeros(1, nVelocity);
 
 % Initial kinetic energy of atoms (excitation is neglected) (eq. 1)
 energyKinetic = ((((energyLaser * absorption) - heatTarget) ...
@@ -48,20 +48,20 @@ for atom = numel(nAtomUC) : -1 : 1
 
         for i = 1 : nVelocity
             % Initial particle distibution per velocity (eq. 3)
-            nVelDisInit(i) = exp(-(velocity(i) - velocityAverage)^2 / ...
+            velocityDistributionInitial(i) = exp(-(velocity(i) - velocityAverage)^2 / ...
                 (2 * velDisWidth^2)) / (velDisWidth * sqrt(2 * pi));
         end
 
         % Normalization factor
         nNorm = (nParticleAngle * (nAtomUC(atom) / sum(nAtomUC))) ...
-                    / sum(nVelDisInit);
+                    / sum(velocityDistributionInitial);
 
         % Normalize velocity distribution
-        nVelDisInit = nVelDisInit .* nNorm;
+        velocityDistributionInitial = velocityDistributionInitial .* nNorm;
 
         % Plot results
         if plotBool
-            plot(velocity, nVelDisInit, 'DisplayName', atomUC(atom).SYMBOL);
+            plot(velocity, velocityDistributionInitial, 'DisplayName', atomUC(atom).SYMBOL);
         end
     end
 end

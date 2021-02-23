@@ -32,7 +32,7 @@ classdef Material
             material.LATTICE_C          = c;
             material.VOLUME             = a * b * c;
             material.DENSITY            = density;
-            material.ATOM_DENSITY       = material.N_ATOMS / material.VOLUME;
+            material.ATOM_DENSITY       = material.N_ATOM / material.VOLUME;
         end
     end
 end

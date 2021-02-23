@@ -1,4 +1,4 @@
-%% PLASMA SOLVER v5.0.0 17-02-21
+%% PLASMA SOLVER v5.0.0 23-02-21
 %
 % Authors:   Tom Wijnands, Bart Boonsma, Sam Borkent
 %
@@ -9,18 +9,28 @@
 %
 %   radius  : Radius / Distance
 %   velo    : Velocity
+%   dist    : Distribution
+%   init    : Initial
 %   n       : Number of particles
 %   bg      : Background gas
 %   uc      : Unit cell
+%   bin     : Computational bin with similar position, velocity, etc.
+%
+% Field names and corresponding index value (see Field enumaration class):
+%   Field.veloBins    (1)
+%        .nParticles  (2)
+%        .nCollisions (3)
+%        .species     (4)
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Clear workspace
 clc, clear, close all
 
-CONSTANT = PhysicalConstants;
-PT = PeriodicTable;
-UC = UnitCells;
+%% Create class instances
+CONSTANT    = PhysicalConstants;
+PT          = PeriodicTable;
+UC          = UnitCells;
 
 %% Initial conditions
 %--------------------------------------------------------------------------
@@ -30,27 +40,28 @@ UC = UnitCells;
 % Save location
 directory   = ['C:\Users\Sam\Google Drive\School\Master\Capita selecta' ...
                 '\Model_Sam\']; % Parent location
-folder      = 'SrTiO3_test';    % Output folder
+folder      = 'test';    % Output folder
 fileName    = 'config';         % Output file
 
 % Add comment to output file
 commentString = [...
-    'Type whatever you want here. For example, this code was one ' ...
-    'of the worst sturctured code I have ever seen.' ...
+    'Type whatever you want here. For example, this script was the ' ...
+    'worst sturctured code I have ever seen.' ...
     ];
 
 %--------------------------------------------------------------------------
 % Plot settings
 %--------------------------------------------------------------------------
 
-plotVelDisInit  = true; % Plot initial velocity distribution (true / false)
-saveVelDisInit  = true; % Save the initial velocity distribution plot (true / false)
+createConfigFile    = false;    % Create a configuration file
+plotVelDisInit      = false;    % Plot initial velocity distribution
+saveVelDisInit      = false;    % Save the initial velocity distribution plot
 
 %--------------------------------------------------------------------------
-% Plot settings
+% Limits
 %--------------------------------------------------------------------------
 
-nMinAngle       = 1;
+nMinAngle       = 1;    % Minimal number of particles per bin
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -59,12 +70,14 @@ nMinAngle       = 1;
 % Temporal limits
 timeMin     = 0;        % Start time [s]
 timeMax     = 18E-6;    % End time [s]
-timeDelta   = 1E-7;     % Time step duration [s]
+% timeDelta   = 1E-7;     % Time step duration [s]
+timeDelta   = 1E-6;
 
 % Radial limits
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
-radiusDelta = 0.5E-4;   % Spatial step size [m]
+% radiusDelta = 0.5E-4;   % Spatial step size [m]
+radiusDelta = 0.01;
 
 % Angular limits
 angleMin    = 0;        % Start angle [deg]
@@ -72,10 +85,10 @@ angleMax    = 90;       % End angle [deg]
 angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
-veloMin     = radiusDelta / timeDelta;  % Minimal initial velocity
-veloMax     = 3E4;                      % Maximal initial velocity
-veloDelta   = 100;
-% veloDelta   = 5;                      % Velocity step size 0 : (V_MIN/V_Delta) : V_Max;
+veloMin         = 0;                        % Minimal initial velocity
+veloMax         = 5E4;                      % Maximal initial velocity
+veloDelta       = radiusDelta / timeDelta;  % Velocity delta to move to next velocity bin
+veloStepsize    = 5;                        % Velocity step size (veloMin : (veloDelta/veloStepsize) : V_Max)
 
 %--------------------------------------------------------------------------
 % Material settings
@@ -174,17 +187,18 @@ energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 energyBinding = energyFormation;    % Binding energy crystal [J]
 
 % Dimensional axis
-time    = timeMin               : timeDelta     : timeMax;      % Temporal axis
-radius  = radiusMin             : radiusDelta   : radiusMax;    % Radial axis
-angle   = angleMin + angleDelta : angleDelta    : angleMax;     % Angular axis
-velo    = veloMin               : veloDelta     : veloMax;      % Velocity array
-% velo  = 0 : (veloMin / veloDelta) : veloMax;
+time    = timeMin   : timeDelta                 : timeMax;   % Temporal axis
+radius  = radiusMin : radiusDelta               : radiusMax; % Radial axis
+angle   = angleMin  : angleDelta                : angleMax;  % Angular axis
+velo    = veloMin   : veloDelta / veloStepsize  : veloMax;   % Velocity array
+veloBins = veloMin : veloDelta : veloMax - veloDelta;
 
 % Dimensional sizes
 nTime   = numel(time);
 nRadius = numel(radius);
 nAngle  = numel(angle);
 nVelo   = numel(velo);
+nVeloBins = numel(veloBins);
 
 %--------------------------------------------------------------------------
 %% Initial ditribution
@@ -194,38 +208,81 @@ nUCAblated      = ablationVolume / ucVolume;    % Number of ablated unit cells
 nAtomAblated    = nUCAblated * nAtomUCSum;      % Number of ablated atoms
 
 % Pre-allocate memory
-nParticleAngle = zeros(1, nAngle - 1);
+nParticleDistribution = zeros(1, nAngle - 1);
 
-% Compute initial angular particle distribution
+% Compute initial angular particle distribution (eq. 5)
 for iAngle = 1 : (nAngle - 1)
-    nParticleAngle(iAngle) = ((4/3)*pi * radiusDelta^3) .* ...
-        (cosd(angle(iAngle)) - cosd(angle(iAngle + 1))) .* ...
-        cosd(angle(iAngle)).^cosPowerFit; %?%
+    nParticleDistribution(iAngle) = ((4/3)*pi * radiusDelta^3) ...
+        .* abs( cosd(angle(iAngle + 1)) - cosd(angle(iAngle)) ) ...
+        .* cosd(angle(iAngle)).^cosPowerFit; %?%
 end
 
 % Normalize and multiply by the total number of ablated atoms
-nParticleAngle = (nParticleAngle .* nAtomAblated) ./ sum(nParticleAngle);
+nParticleDistribution = (nParticleDistribution .* nAtomAblated) ./ sum(nParticleDistribution);
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
-createConfigFile( directory, folder, fileName, commentString, time, ...
-    radius, angle, velo, bgPressure );
+if createConfigFile
+    createConfigFile( directory, folder, fileName, commentString, time, ...
+        radius, angle, velo, bgPressure );
+end
 
 %--------------------------------------------------------------------------
-%% Calculate the initial particle velocity distribution
-[nVeloDistributionInitial, E_k] = initialVelocityDistribution( plotVelDisInit, ...
-    saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
-    energyLaser, energyBinding, heatTarget, absorption, nParticleAngle(1) );
+%% Preallocation
+% Number of property fields per velocity bin
+nFieldsPerVeloBin = numel(enumeration('Field'));
 
-%--------------------------------------------------------------------------
-%% Main program
+% Plasma plume particle matrix
+plasmaMatrix = zeros(nVeloBins, nFieldsPerVeloBin, nRadius - 1);
 
-for theta = 1 : 1 %(numel(rad) - 1)
-    % Initiate
-    nAtom = 1;
+% Copy plasma matrix
+bgMatrix = plasmaMatrix;
+
+% Insert velocity bins
+for iRadius = 1 : (nRadius - 1)
+    plasmaMatrix(:, Field.veloBins, iRadius) = veloBins;
+end
+
+for iAngle = 1 : (nAngle - 1)
+    %% Main program per angle
+    % Initiate number of atoms
+    nParticleAngle = nMinAngle;
     
     % Number of atoms at current angle
-    if nParticleAngle(theta) > nMinAngle
-        nAtom = nParticleAngle(theta);
+    if nParticleDistribution(iAngle) > nMinAngle
+        nParticleAngle = nParticleDistribution(iAngle);
+    end
+    
+    % Calculate the initial particle velocity distribution
+    veloDistInit = initialVelocityDistribution( plotVelDisInit, ...
+        saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
+        energyLaser, energyBinding, heatTarget, absorption, nParticleAngle );
+    
+    % Only plot and save initial particle velocity distribution for the
+    % center of the plume
+    if iAngle == 1
+        plotVelDisInit = false;
+        saveVelDitInit = false;
+    end
+    
+    for iTime = 1 : nTime
+        %% Main program per timestep
+        
+        for iRadius = 1 : (nRadius - 1)
+            %% Main program per radial bin
+            
+            % Calculate bin volumes and background particle density per bin
+            binVolume = (4/3)*pi ...
+                * ( (radius(iRadius + 1))^3 ...
+                - (radius(iRadius))^3 ) ...
+                * ( cosd(angle(iAngle)) ...
+                - cosd(angle(iAngle + 1)) ); % Bin volume [m^3]
+
+            % Background particle density per bin
+            bgBinNParticle = bgDensity * binVolume;
+
+            % Insert in background particle matrix
+            bgMatrix(:, Field.nParticles, iRadius) = bgBinNParticle;
+        end
     end
 end

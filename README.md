@@ -22,17 +22,33 @@ include two metals with highly different masses (Li4Ti5O12).
     SrTiOx). This model assumes no oxygen vacancies or excess in the
     target. (e.g. SrTiO3, Li4Ti5O12)
 * The excitation energy of the atoms in the unit cell are neglected
+* Identical particles are assumed to seperate in space due to their
+    initial velocity distribution, thus collisions between identical
+    particles are neglected
 
 # Naming conventions
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
 
 * radius    : Radius / Distance
 * velo      : Velocity
+* dist      : Distribution
+* init      : Initial
 * n         : Number of particles
 * bg        : Background gas
 * uc        : Unit cell
+* bin       : Computational bin with similar position, velocity, etc.
+
+Field names and corresponding index value: (see Field enumeration class)
+* Field.veloBins    (1)
+* Field.nParticles  (2)
 
 # Change log
+23-02-21:
+* Started work on the main program, replaced struct with a 3D matrix to
+    improve performance
+* Added Field enumerator class to index fields withing the 3D matrix to
+    improve readability
+
 22-02-21:
 * Added amount array and number of atoms property to Material, replaced
     elements string for PeriodicTable reference
@@ -92,6 +108,8 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
     a factor 10 too high
 
 # To do
+* Make fill inital plume and background matrix a function
+* Implement folder selection into initialVelocityDistribution save feature
 * Get correct formation energy of cubic spinel Li4Ti5O12 target
 * Check which Li, Ti, and O molecules forms in the PLD plasma plume
 * Check initial particle velocity distribution width
@@ -105,14 +123,13 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
 * Check which data is relevant to print in config file
 
 # Questions
+* Why are all the array's in the Makestruct function double?
+    Example: V = [0 20000 40000 0 20000 40000]
 * Why is the crystal binding energy 5x the formation energy?
 * What is the target density, and why is it 1?
 * Why are O2 and Ti2O3 not included in mass array?
 * Why is only the activation energy of TiO listed, and not of SrO or
   O2?
-* Why clear variables from memory within loop, instead of overwriting?
 * Where does the 0.9 come from in Tom's average velocity?
-* Why is the average velocity twice divided by the number of atoms in
-  the unit cell?
 * Why is the total number of ablated unit cells divided by the number of
     atoms in the unit cell?
