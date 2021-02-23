@@ -41,6 +41,8 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
 Field names and corresponding index value: (see Field enumeration class)
 * Field.veloBins    (1)
 * Field.nParticles  (2)
+* Field.nCollisions (3)
+* Field.species     (4)
 
 # Change log
 23-02-21:
@@ -123,7 +125,7 @@ Field names and corresponding index value: (see Field enumeration class)
 * Check which data is relevant to print in config file
 
 # Questions
-* Why are all the array's in the Makestruct function double?
+* Why are all the array's in the Makestruct function doubled?
     Example: V = [0 20000 40000 0 20000 40000]
 * Why is the crystal binding energy 5x the formation energy?
 * What is the target density, and why is it 1?
