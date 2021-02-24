@@ -73,7 +73,7 @@ if plotBool
     
     % Save figure
     if saveBool
-        saveas(figVelDisInit, [uc.FORMULA '1.png']);
+        saveas(figVelDisInit, [pwd '/results/' uc.FORMULA '.png']);
     end
 end
 

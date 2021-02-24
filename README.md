@@ -45,6 +45,9 @@ Field names and corresponding index value: (see Field enumeration class)
 * Field.species     (4)
 
 # Change log
+24-02-21:
+* Changed file structure
+
 23-02-21:
 * Started work on the main program, replaced struct with a 3D matrix to
     improve performance

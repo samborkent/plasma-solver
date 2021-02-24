@@ -27,20 +27,18 @@
 %% Clear workspace
 clc, clear, close all
 
-%% Create class instances
-CONSTANT    = PhysicalConstants;
-PT          = PeriodicTable;
-UC          = UnitCells;
+%% File settings
 
-%% Initial conditions
-%--------------------------------------------------------------------------
-% File settings
-%--------------------------------------------------------------------------
+% Get current path
+currentPath = pwd;
+
+% Add 
+addpath([currentPath '/functions/']);
+addpath([currentPath '/classes/']);
 
 % Save location
-directory   = ['C:\Users\Sam\Google Drive\School\Master\Capita selecta' ...
-                '\Model_Sam\']; % Parent location
-folder      = 'test';    % Output folder
+directory   = currentPath;      % Parent location
+folder      = 'results';        % Output folder
 fileName    = 'config';         % Output file
 
 % Add comment to output file
@@ -49,19 +47,22 @@ commentString = [...
     'worst sturctured code I have ever seen.' ...
     ];
 
-%--------------------------------------------------------------------------
-% Plot settings
-%--------------------------------------------------------------------------
+%% Plot settings
+createConfigBool    = true;    % Create a configuration file
+plotVelDisInit      = true;    % Plot initial velocity distribution
+saveVelDisInit      = true;    % Save the initial velocity distribution plot
 
-createConfigFile    = false;    % Create a configuration file
-plotVelDisInit      = false;    % Plot initial velocity distribution
-saveVelDisInit      = false;    % Save the initial velocity distribution plot
+%% Create class instances holding constants and material properties
+C   = PhysicalConstants;
+PT  = PeriodicTable;
+UC  = UnitCells;
 
+%% Initial conditions
 %--------------------------------------------------------------------------
 % Limits
 %--------------------------------------------------------------------------
 
-nMinAngle       = 1;    % Minimal number of particles per bin
+nMinAngle = 1;    % Minimal number of particles per bin
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -174,7 +175,7 @@ veloDistributionWidth = 1500;   % Initial particle velocity distribution width (
 %% Constant calculation based on parameters
 
 % Background gas density (ideal gas law) 
-bgDensity = bgPressure / (CONSTANT.BOLTZMANN * bgTemperature);
+bgDensity = bgPressure / (C.BOLTZMANN * bgTemperature);
 
 % Ablation volume [m^3]
 ablationVolume  = spotWidth * spotHeight * ablationDepth;
@@ -222,7 +223,7 @@ nParticleDistribution = (nParticleDistribution .* nAtomAblated) ./ sum(nParticle
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
-if createConfigFile
+if createConfigBool
     createConfigFile( directory, folder, fileName, commentString, time, ...
         radius, angle, velo, bgPressure );
 end
