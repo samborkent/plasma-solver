@@ -3,7 +3,7 @@ Author: Tom Wijnands
 
 Modified for two metal oxides by: Bart Boonstra
 
-Reworked and modified for lithium metal oxides by: Sam Borkent
+Rewritten and modified for lithium metal oxides by: Sam Borkent
 
 Based on 'Numerical modelling of the plasma plume propagation and oxidation
 during pulsed laser deposition of complex oxide thin films', 2020, by
