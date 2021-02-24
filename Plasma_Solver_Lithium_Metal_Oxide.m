@@ -49,8 +49,8 @@ commentString = [...
 
 %% Plot settings
 createConfigBool    = true;    % Create a configuration file
-plotVelDisInit      = true;    % Plot initial velocity distribution
-saveVelDisInit      = true;    % Save the initial velocity distribution plot
+plotVelDisInit      = false;    % Plot initial velocity distribution
+saveVelDisInit      = false;    % Save the initial velocity distribution plot
 
 %% Create class instances holding constants and material properties
 C   = PhysicalConstants;
@@ -62,7 +62,7 @@ UC  = UnitCells;
 % Limits
 %--------------------------------------------------------------------------
 
-nMinAngle = 1;    % Minimal number of particles per bin
+nParticleMin = 1;    % Minimal number of particles per bin
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -78,7 +78,7 @@ timeDelta   = 1E-6;
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
 % radiusDelta = 0.5E-4;   % Spatial step size [m]
-radiusDelta = 0.01;
+radiusDelta = 0.001;
 
 % Angular limits
 angleMin    = 0;        % Start angle [deg]
@@ -236,27 +236,27 @@ nFieldsPerVeloBin = numel(enumeration('Field'));
 % Plasma plume particle matrix
 plasmaMatrix = zeros(nVeloBins, nFieldsPerVeloBin, nRadius - 1);
 
-% Copy plasma matrix
-bgMatrix = plasmaMatrix;
-
 % Insert velocity bins
 for iRadius = 1 : (nRadius - 1)
     plasmaMatrix(:, Field.veloBins, iRadius) = veloBins;
 end
 
-for iAngle = 1 : (nAngle - 1)
+% Copy plasma matrix
+bgMatrix = plasmaMatrix;
+
+for iAngle = 1 : 1
     %% Main program per angle
     % Initiate number of atoms
-    nParticleAngle = nMinAngle;
+    nParticleAngle = nParticleMin;
     
     % Number of atoms at current angle
-    if nParticleDistribution(iAngle) > nMinAngle
+    if nParticleDistribution(iAngle) > nParticleMin
         nParticleAngle = nParticleDistribution(iAngle);
     end
     
     % Calculate the initial particle velocity distribution
     veloDistInit = initialVelocityDistribution( plotVelDisInit, ...
-        saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
+        saveVelDisInit, veloBins, veloDistributionWidth, nUCAblated, uc, ...
         energyLaser, energyBinding, heatTarget, absorption, nParticleAngle );
     
     % Only plot and save initial particle velocity distribution for the
@@ -265,6 +265,8 @@ for iAngle = 1 : (nAngle - 1)
         plotVelDisInit = false;
         saveVelDitInit = false;
     end
+    
+    plasmaMatrix(:, Field.nParticles, 1) = veloDistInit;
     
     for iTime = 1 : nTime
         %% Main program per timestep
@@ -284,6 +286,42 @@ for iAngle = 1 : (nAngle - 1)
 
             % Insert in background particle matrix
             bgMatrix(:, Field.nParticles, iRadius) = bgBinNParticle;
-        end
-    end
-end
+            
+            % Loop though velocity bins from highest to lowest
+            for iVelo = numel(veloBins) : -1 : 1
+                %% Main program per velocity bin
+                
+                % Store matrix properties in variables
+                veloPlasma  = plasmaMatrix(iVelo, Field.veloBins, iRadius);
+                nPlasma     = plasmaMatrix(iVelo, Field.nParticles, iRadius);
+                veloBg      = bgMatrix(iVelo, Field.veloBins, iRadius);
+                nBg         = bgMatrix(iVelo, Field.nParticles, iRadius);
+                
+                % Average distance traveled in this time step
+                radiusTraveled = abs(veloPlasma * timeDelta);
+                
+                % Number of radius bins traveles
+                nRadiusBinTraveled = radiusTraveled / radiusDelta;
+                
+                % Limit number of traveled radius bins to prevent index
+                % out-of-bounds error
+                if nRadiusBinTraveled > (nRadius - 2)
+                    nRadius = nRadius - 2;
+                end
+                
+                % If the bin has not enough particles
+                if (nPlasma < nParticleMin) && (nRadiusBinTraveled < 1)
+                    colChanceStatic     = zeros(1, nRadiusBinTraveled);
+                    colChanceKinetic    = zeros(1, nRadiusBinTraveled);
+                % If bin has enough particles
+                else
+                    % Loop through distance traveled in steps radiusDelta
+                    for iRadiusDelta = iRadius : nRadiusBinTraveled
+                        % Calculate collision probability per radius bin
+                        
+                    end % For radiusDelta
+                end % If number of particles
+            end % For velocity
+        end % For radius
+    end % For time
+end % For angle

@@ -1,0 +1,10 @@
+CONFIGURATION FILE	2021-02-24	13:31
+
+Temporal limits [s]:			0 : 9.47e-07 : 1.8e-05
+Radial limits [m]:			0 : 0.000984 : 0.06
+Angular limits [deg]:			0 : 2.9 : 90
+Velocity limits [m/s]:			0 : 199 : 5e+04
+Background pressue [mbar]:		10
+
+	Comments:
+Type whatever you want here. For example, this script was the worst sturctured code I have ever seen.

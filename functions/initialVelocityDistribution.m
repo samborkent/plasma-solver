@@ -61,7 +61,9 @@ for atom = numel(nAtomUC) : -1 : 1
 
         % Plot results
         if plotBool
-            plot(velocity, velocityDistributionInitial, 'DisplayName', atomUC(atom).SYMBOL);
+%             plot(velocity, velocityDistributionInitial, 'DisplayName', atomUC(atom).SYMBOL);
+            bar(velocity, velocityDistributionInitial, 'grouped', ...
+                'LineStyle', 'none', 'DisplayName', atomUC(atom).SYMBOL);
         end
     end
 end

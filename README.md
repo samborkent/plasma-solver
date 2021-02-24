@@ -47,6 +47,7 @@ Field names and corresponding index value: (see Field enumeration class)
 # Change log
 24-02-21:
 * Changed file structure
+* Added documentation
 
 23-02-21:
 * Started work on the main program, replaced struct with a 3D matrix to

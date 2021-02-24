@@ -22,7 +22,7 @@ if ~isfolder([directory folder])
 end
 
 % Generate file path
-FILE_PATH = [directory folder '\' fileName '_' ...
+FILE_PATH = [directory '\' folder '\' fileName '_' ...
     datestr(now, 'yyyy-mm-dd_HHMM') '.txt'];
 
 % Open file for writing
