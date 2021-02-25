@@ -1,4 +1,4 @@
-function [velocityDistributionInitial, figVelDisInit] = initialVelocityDistribution( ...
+function [nVeloInit, figVelDisInit] = initialVelocityDistribution( ...
     plotBool, saveBool, velocity, velDisWidth, nUCAblated, uc, ...
     energyLaser, energyBinding, heatTarget, absorption, nParticleAngle )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
@@ -28,12 +28,12 @@ if plotBool
 end
 
 % Get constants
-nVelocity   = numel(velocity);
+nVelo   = numel(velocity);
 atomUC      = uc.ELEMENTS;
 nAtomUC     = uc.AMOUNT;
 
 % Pre-allocate
-velocityDistributionInitial = zeros(1, nVelocity);
+nVeloInit = zeros(nAtomUC, nVelo);
 
 % Initial kinetic energy of atoms (excitation is neglected) (eq. 1)
 energyKinetic = ((((energyLaser * absorption) - heatTarget) ...
@@ -46,23 +46,23 @@ for atom = numel(nAtomUC) : -1 : 1
 %         velocityAverage = sqrt( ( (energyLaser * 0.9 * adsorptionC) / 3 / ...
 %             nUCAblated - energyBinding) / 2 / atomUC(atom).MASS);
 
-        for i = 1 : nVelocity
+        for iVelo = 1 : nVelo
             % Initial particle distibution per velocity (eq. 3)
-            velocityDistributionInitial(i) = exp(-(velocity(i) - velocityAverage)^2 / ...
+            nVeloInit(atom, iVelo) = exp(-(velocity(iVelo) - velocityAverage)^2 / ...
                 (2 * velDisWidth^2)) / (velDisWidth * sqrt(2 * pi));
         end
 
         % Normalization factor
         nNorm = (nParticleAngle * (nAtomUC(atom) / sum(nAtomUC))) ...
-                    / sum(velocityDistributionInitial);
+                    / sum(nVeloInit(atom));
 
         % Normalize velocity distribution
-        velocityDistributionInitial = velocityDistributionInitial .* nNorm;
+        nVeloInit(atom) = nVeloInit(atom) .* nNorm;
 
         % Plot results
         if plotBool
 %             plot(velocity, velocityDistributionInitial, 'DisplayName', atomUC(atom).SYMBOL);
-            bar(velocity, velocityDistributionInitial, 'grouped', ...
+            bar(velocity, nVeloInit, 'grouped', ...
                 'LineStyle', 'none', 'DisplayName', atomUC(atom).SYMBOL);
         end
     end

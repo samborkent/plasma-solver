@@ -89,7 +89,7 @@ angleDelta  = 3;        % Radial step size [deg]
 veloMin         = 0;                        % Minimal initial velocity
 veloMax         = 5E4;                      % Maximal initial velocity
 veloDelta       = radiusDelta / timeDelta;  % Velocity delta to move to next velocity bin
-veloStepsize    = 5;                        % Velocity step size (veloMin : (veloDelta/veloStepsize) : V_Max)
+veloStepsize    = 1;                        % Velocity step size (veloMin : (veloDelta/veloStepsize) : V_Max)
 
 %--------------------------------------------------------------------------
 % Material settings
@@ -188,11 +188,10 @@ energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 energyBinding = energyFormation;    % Binding energy crystal [J]
 
 % Dimensional axis
-time    = timeMin   : timeDelta                 : timeMax;   % Temporal axis
-radius  = radiusMin : radiusDelta               : radiusMax; % Radial axis
-angle   = angleMin  : angleDelta                : angleMax;  % Angular axis
-velo    = veloMin   : veloDelta / veloStepsize  : veloMax;   % Velocity array
-veloBins = veloMin : veloDelta : veloMax - veloDelta;
+angle   = angleMin  : angleDelta                : angleMax - angleDelta;   % Angular axis
+time    = timeMin   : timeDelta                 : timeMax - timeDelta;     % Temporal axis
+radius  = radiusMin : radiusDelta               : radiusMax - radiusDelta; % Radial axis
+velo    = veloMin   : veloDelta / veloStepsize  : veloMax - veloDelta;     % Velocity array
 
 % Dimensional sizes
 nTime   = numel(time);
@@ -234,17 +233,17 @@ end
 nFieldsPerVeloBin = numel(enumeration('Field'));
 
 % Plasma plume particle matrix
-plasmaMatrix = zeros(nVeloBins, nFieldsPerVeloBin, nRadius - 1);
+plasmaMatrix = zeros(nVeloBins, nFieldsPerVeloBin, nRadius, nAtomUcNumel);
 
 % Insert velocity bins
-for iRadius = 1 : (nRadius - 1)
+for iRadius = 1 : nRadius
     plasmaMatrix(:, Field.veloBins, iRadius) = veloBins;
 end
 
 % Copy plasma matrix
 bgMatrix = plasmaMatrix;
 
-for iAngle = 1 : 1
+for iAngle = 1 : nAngle
     %% Main program per angle
     % Initiate number of atoms
     nParticleAngle = nParticleMin;
@@ -271,7 +270,7 @@ for iAngle = 1 : 1
     for iTime = 1 : nTime
         %% Main program per timestep
         
-        for iRadius = 1 : (nRadius - 1)
+        for iRadius = 1 : nRadius
             %% Main program per radial bin
             
             % Calculate bin volumes and background particle density per bin
@@ -285,31 +284,30 @@ for iAngle = 1 : 1
             bgBinNParticle = bgDensity * binVolume;
 
             % Insert in background particle matrix
-            bgMatrix(:, Field.nParticles, iRadius) = bgBinNParticle;
+            bgMatrix(1, Field.nParticles, iRadius) = bgBinNParticle;
             
             % Loop though velocity bins from highest to lowest
             for iVelo = numel(veloBins) : -1 : 1
                 %% Main program per velocity bin
                 
                 % Store matrix properties in variables
-                veloPlasma  = plasmaMatrix(iVelo, Field.veloBins, iRadius);
                 nPlasma     = plasmaMatrix(iVelo, Field.nParticles, iRadius);
-                veloBg      = bgMatrix(iVelo, Field.veloBins, iRadius);
                 nBg         = bgMatrix(iVelo, Field.nParticles, iRadius);
                 
                 % Average distance traveled in this time step
-                radiusTraveled = abs(veloPlasma * timeDelta);
+                radiusTraveled = veloBins(iVelo) * timeDelta;
                 
                 % Number of radius bins traveles
                 nRadiusBinTraveled = radiusTraveled / radiusDelta;
                 
                 % Limit number of traveled radius bins to prevent index
                 % out-of-bounds error
-                if nRadiusBinTraveled > (nRadius - 2)
-                    nRadius = nRadius - 2;
+                if nRadiusBinTraveled > (nRadius - 1)
+                    nRadius = nRadius - 1;
                 end
                 
-                % If the bin has not enough particles
+                % If the bin has not enough particles and the particle has 
+                % not traveled far enough to reach another bin
                 if (nPlasma < nParticleMin) && (nRadiusBinTraveled < 1)
                     colChanceStatic     = zeros(1, nRadiusBinTraveled);
                     colChanceKinetic    = zeros(1, nRadiusBinTraveled);

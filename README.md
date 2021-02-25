@@ -25,6 +25,10 @@ include two metals with highly different masses (Li4Ti5O12).
 * Identical particles are assumed to seperate in space due to their
     initial velocity distribution, thus collisions between identical
     particles are neglected
+* The background gas starts out with zero velocity, as the room tempreature
+    velocity is aroung 400 m/s, which is two orders smaller than the plume
+    particle velocities. The particles in the background gas don't have a
+    preferential direction, so their average velocity zeros out.
 
 # Naming conventions
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
@@ -39,12 +43,18 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
 * bin       : Computational bin with similar position, velocity, etc.
 
 Field names and corresponding index value: (see Field enumeration class)
-* Field.veloBins    (1)
-* Field.nParticles  (2)
-* Field.nCollisions (3)
-* Field.species     (4)
+* Field.nParticles  (1)
+* Field.nCollisions (2)
 
 # Change log
+
+25-02-21:
+* Changed initialVelocityDistribution to output all particle velocity
+    distributions in one matrix
+* Changed Fields, matrices do not have to hold velocity axis, only number
+    of particles in each velocity bin, and the average number of collisions
+* Added dimension to plume matrix to hold all species simultaneously
+
 24-02-21:
 * Changed file structure
 * Added documentation

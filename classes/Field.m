@@ -3,10 +3,8 @@ classdef Field < uint32
     %   code readability
     
     enumeration
-        veloBins    (1)
-        nParticles  (2)
-        nCollisions (3)
-        species     (4)
+        nParticles  (1)
+        nCollisions (2)
     end
 end
 
