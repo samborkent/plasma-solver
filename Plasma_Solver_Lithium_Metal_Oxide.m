@@ -14,13 +14,13 @@
 %   n       : Number of particles
 %   bg      : Background gas
 %   uc      : Unit cell
-%   bin     : Computational bin with similar position, velocity, etc.
 %
-% Field names and corresponding index value (see Field enumaration class):
-%   Field.veloBins    (1)
-%        .nParticles  (2)
-%        .nCollisions (3)
-%        .species     (4)
+%   Field names and corresponding index value (see Field enumaration class):
+%       Field.nParticles    (1)
+%            .nCollisions   (2)
+%
+%   Example:
+%       nParticleVelo: number of plasma plume particles per velocity bin
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -48,8 +48,8 @@ commentString = [...
     ];
 
 %% Plot settings
-createConfigBool    = true;    % Create a configuration file
-plotVelDisInit      = false;    % Plot initial velocity distribution
+createConfigBool    = false;    % Create a configuration file
+plotVelDisInit      = true;    % Plot initial velocity distribution
 saveVelDisInit      = false;    % Save the initial velocity distribution plot
 
 %% Create class instances holding constants and material properties
@@ -96,7 +96,7 @@ veloStepsize    = 1;                        % Velocity step size (veloMin : (vel
 %--------------------------------------------------------------------------
 
 % Unit cell
-uc              = UC.Li4Ti5O12;  
+uc              = UC.TiO2;  
 atomUC          = uc.ELEMENTS;      % Atoms in unit cell
 nAtomUC         = uc.AMOUNT;        % Amount of each atom in unit cell [A B O]
 nAtomUCNumel    = numel(nAtomUC);
@@ -198,7 +198,6 @@ nTime   = numel(time);
 nRadius = numel(radius);
 nAngle  = numel(angle);
 nVelo   = numel(velo);
-nVeloBins = numel(veloBins);
 
 %--------------------------------------------------------------------------
 %% Initial ditribution
@@ -208,17 +207,17 @@ nUCAblated      = ablationVolume / ucVolume;    % Number of ablated unit cells
 nAtomAblated    = nUCAblated * nAtomUCSum;      % Number of ablated atoms
 
 % Pre-allocate memory
-nParticleDistribution = zeros(1, nAngle - 1);
+nParticleAngleInit = zeros(1, nAngle - 1);
 
 % Compute initial angular particle distribution (eq. 5)
 for iAngle = 1 : (nAngle - 1)
-    nParticleDistribution(iAngle) = ((4/3)*pi * radiusDelta^3) ...
+    nParticleAngleInit(iAngle) = ((4/3)*pi * radiusDelta^3) ...
         .* abs( cosd(angle(iAngle + 1)) - cosd(angle(iAngle)) ) ...
-        .* cosd(angle(iAngle)).^cosPowerFit; %?%
+        .* cosd(angle(iAngle)).^cosPowerFit;
 end
 
 % Normalize and multiply by the total number of ablated atoms
-nParticleDistribution = (nParticleDistribution .* nAtomAblated) ./ sum(nParticleDistribution);
+nParticleAngleInit = (nParticleAngleInit .* nAtomAblated) ./ sum(nParticleAngleInit);
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
@@ -230,18 +229,13 @@ end
 %--------------------------------------------------------------------------
 %% Preallocation
 % Number of property fields per velocity bin
-nFieldsPerVeloBin = numel(enumeration('Field'));
+nFieldsVelo = numel(enumeration('Field'));
 
 % Plasma plume particle matrix
-plasmaMatrix = zeros(nVeloBins, nFieldsPerVeloBin, nRadius, nAtomUcNumel);
+plasmaMatrix = zeros(nVelo, nFieldsVelo, nRadius, nAtomUCNumel);
 
-% Insert velocity bins
-for iRadius = 1 : nRadius
-    plasmaMatrix(:, Field.veloBins, iRadius) = veloBins;
-end
-
-% Copy plasma matrix
-bgMatrix = plasmaMatrix;
+% Background gas particle matrix
+bgMatrix = zeros(nVelo, nFieldsVelo, nRadius);
 
 for iAngle = 1 : nAngle
     %% Main program per angle
@@ -249,13 +243,13 @@ for iAngle = 1 : nAngle
     nParticleAngle = nParticleMin;
     
     % Number of atoms at current angle
-    if nParticleDistribution(iAngle) > nParticleMin
-        nParticleAngle = nParticleDistribution(iAngle);
+    if nParticleAngleInit(iAngle) > nParticleMin
+        nParticleAngle = nParticleAngleInit(iAngle);
     end
     
     % Calculate the initial particle velocity distribution
-    veloDistInit = initialVelocityDistribution( plotVelDisInit, ...
-        saveVelDisInit, veloBins, veloDistributionWidth, nUCAblated, uc, ...
+    nParticleVeloInit = initialVelocityDistribution( plotVelDisInit, ...
+        saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
         energyLaser, energyBinding, heatTarget, absorption, nParticleAngle );
     
     % Only plot and save initial particle velocity distribution for the
@@ -265,7 +259,7 @@ for iAngle = 1 : nAngle
         saveVelDitInit = false;
     end
     
-    plasmaMatrix(:, Field.nParticles, 1) = veloDistInit;
+    plasmaMatrix(:, Field.nParticles, 1) = nParticleVeloInit;
     
     for iTime = 1 : nTime
         %% Main program per timestep

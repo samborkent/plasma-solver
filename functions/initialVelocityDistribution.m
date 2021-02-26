@@ -1,5 +1,5 @@
-function [nVeloInit, figVelDisInit] = initialVelocityDistribution( ...
-    plotBool, saveBool, velocity, velDisWidth, nUCAblated, uc, ...
+function nParticleVeloInit = initialVelocityDistribution( ...
+    plotBool, saveBool, velo, velDisWidth, nUCAblated, uc, ...
     energyLaser, energyBinding, heatTarget, absorption, nParticleAngle )
 %INITIALVELOCITYDISTRIBUTION Generate initial particle velocity ditribution
 %   plotBool            Boolean which determines if results will be plotted
@@ -13,7 +13,7 @@ function [nVeloInit, figVelDisInit] = initialVelocityDistribution( ...
 %   energyLaser         Laser energy [J]
 %   energyBinding       Binding energy of unit cell [J]
 %   heatTarget          Heat loss into the target [J]
-%   adsorption          Adsorption coefficient of the target [0 : 1]
+%   absorption          Absorption coefficient of the target [0 : 1]
 %
 
 % Make plot
@@ -27,43 +27,41 @@ if plotBool
 %     ylim([0 2.5E13]);
 end
 
-% Get constants
-nVelo   = numel(velocity);
-atomUC      = uc.ELEMENTS;
-nAtomUC     = uc.AMOUNT;
+% Calculate constants
+nVelo = numel(velo);
 
 % Pre-allocate
-nVeloInit = zeros(nAtomUC, nVelo);
+nParticleVeloInit = zeros(nVelo, numel(uc.ELEMENTS));
 
 % Initial kinetic energy of atoms (excitation is neglected) (eq. 1)
 energyKinetic = ((((energyLaser * absorption) - heatTarget) ...
-                / nUCAblated) - energyBinding) / sum(nAtomUC);
+                / nUCAblated) - energyBinding) / sum(uc.AMOUNT);
 
-for atom = numel(nAtomUC) : -1 : 1
-    if (nAtomUC(atom) > 0)       
+for atom = numel(uc.ELEMENTS) : -1 : 1
+    if (uc.AMOUNT(atom) > 0)       
         % Initial average velocity
-        velocityAverage = sqrt(2 * energyKinetic / atomUC(atom).MASS);
+        velocityAverage = sqrt(2 * energyKinetic / uc.ELEMENTS(atom).MASS);
 %         velocityAverage = sqrt( ( (energyLaser * 0.9 * adsorptionC) / 3 / ...
 %             nUCAblated - energyBinding) / 2 / atomUC(atom).MASS);
 
         for iVelo = 1 : nVelo
             % Initial particle distibution per velocity (eq. 3)
-            nVeloInit(atom, iVelo) = exp(-(velocity(iVelo) - velocityAverage)^2 / ...
+            nParticleVeloInit(iVelo, atom) = exp(-(velo(iVelo) - velocityAverage)^2 / ...
                 (2 * velDisWidth^2)) / (velDisWidth * sqrt(2 * pi));
         end
 
         % Normalization factor
-        nNorm = (nParticleAngle * (nAtomUC(atom) / sum(nAtomUC))) ...
-                    / sum(nVeloInit(atom));
+        nNorm = (nParticleAngle * (uc.AMOUNT(atom) / sum(uc.AMOUNT))) ...
+                    / sum(nParticleVeloInit(:, atom));
 
         % Normalize velocity distribution
-        nVeloInit(atom) = nVeloInit(atom) .* nNorm;
+        nParticleVeloInit(:, atom) = nParticleVeloInit(:, atom) .* nNorm;
 
         % Plot results
         if plotBool
 %             plot(velocity, velocityDistributionInitial, 'DisplayName', atomUC(atom).SYMBOL);
-            bar(velocity, nVeloInit, 'grouped', ...
-                'LineStyle', 'none', 'DisplayName', atomUC(atom).SYMBOL);
+            bar(velo, nParticleVeloInit(:, atom), 'grouped', ...
+                'LineStyle', 'none', 'DisplayName', uc.ELEMENTS(atom).SYMBOL);
         end
     end
 end
