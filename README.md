@@ -43,10 +43,15 @@ Loosly resemble paper names and follow MATLAB style guidelines v1.3
 * bin       : Computational bin with similar position, velocity, etc.
 
 Field names and corresponding index value: (see Field enumeration class)
-* Field.nParticles  (1)
-* Field.nCollisions (2)
+* Field.nParticles  (1)     Number of particles
+* Field.nCollisions (2)     Number of collisions
+* Field.O           (1)     Oxygen
 
 # Change log
+
+27-02-21:
+* Added memory check to prevent program from running if not enough memory
+    is available
 
 25-02-21:
 * Changed initialVelocityDistribution to output all particle velocity

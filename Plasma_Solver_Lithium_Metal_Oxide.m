@@ -37,9 +37,9 @@ addpath([currentPath '/functions/']);
 addpath([currentPath '/classes/']);
 
 % Save location
-directory   = currentPath;      % Parent location
+% directory   = currentPath;    % Parent location
 folder      = 'results';        % Output folder
-fileName    = 'config';         % Output file
+fileName    = 'config';         % File name of configuration file
 
 % Add comment to output file
 commentString = [...
@@ -71,8 +71,8 @@ nParticleMin = 1;    % Minimal number of particles per bin
 % Temporal limits
 timeMin     = 0;        % Start time [s]
 timeMax     = 18E-6;    % End time [s]
-% timeDelta   = 1E-7;     % Time step duration [s]
-timeDelta   = 1E-6;
+timeDelta   = 1E-7;     % Time step duration [s]
+% timeDelta   = 1E-6;
 
 % Radial limits
 radiusMin   = 0;        % Start position [m]
@@ -190,7 +190,7 @@ energyBinding = energyFormation;    % Binding energy crystal [J]
 % Dimensional axis
 angle   = angleMin  : angleDelta                : angleMax - angleDelta;   % Angular axis
 time    = timeMin   : timeDelta                 : timeMax - timeDelta;     % Temporal axis
-radius  = radiusMin : radiusDelta               : radiusMax - radiusDelta; % Radial axis
+radius  = radiusMin : radiusDelta               : radiusMax;               % Radial axis
 velo    = veloMin   : veloDelta / veloStepsize  : veloMax - veloDelta;     % Velocity array
 
 % Dimensional sizes
@@ -207,22 +207,22 @@ nUCAblated      = ablationVolume / ucVolume;    % Number of ablated unit cells
 nAtomAblated    = nUCAblated * nAtomUCSum;      % Number of ablated atoms
 
 % Pre-allocate memory
-nParticleAngleInit = zeros(1, nAngle - 1);
+nParticleAngleArray = zeros(1, nAngle - 1);
 
 % Compute initial angular particle distribution (eq. 5)
-for iAngle = 1 : (nAngle - 1)
-    nParticleAngleInit(iAngle) = ((4/3)*pi * radiusDelta^3) ...
+for iAngle = 1 : nAngle
+    nParticleAngleArray(iAngle) = ((4/3)*pi * radiusDelta^3) ...
         .* abs( cosd(angle(iAngle + 1)) - cosd(angle(iAngle)) ) ...
         .* cosd(angle(iAngle)).^cosPowerFit;
 end
 
 % Normalize and multiply by the total number of ablated atoms
-nParticleAngleInit = (nParticleAngleInit .* nAtomAblated) ./ sum(nParticleAngleInit);
+nParticleAngleArray = (nParticleAngleArray .* nAtomAblated) ./ sum(nParticleAngleArray);
 
 %--------------------------------------------------------------------------
 %% Write settings into config file
 if createConfigBool
-    createConfigFile( directory, folder, fileName, commentString, time, ...
+    createConfigFile( currentPath, folder, fileName, commentString, time, ...
         radius, angle, velo, bgPressure );
 end
 
@@ -231,20 +231,54 @@ end
 % Number of property fields per velocity bin
 nFieldsVelo = numel(enumeration('Field'));
 
+% Memory of double [Bytes]
+double = 8;
+
+% Available RAM [GBytes]
+memoryLimit = 4;
+
+% Calculate memory size of plume and background particle matrices combined
+% memorySize = nVelo * nFieldsVelo * nRadius * nTime * (nSpecies + 1) ...
+%                 * nAngle * double * 10^-9;
+memorySize = nVelo * nFieldsVelo * nRadius * (nAtomUCNumel + 1) * double * 10^-9;
+
+% If the required memory exceeds the available memory, abort program and
+% prompt error message
+if (memorySize > memoryLimit)
+    error(['Memory limit exceeded. Lower spatial, temporal, or angular' ...
+            'resolution to reduce memory size of particle matrices.'])
+end
+
 % Plasma plume particle matrix
 plasmaMatrix = zeros(nVelo, nFieldsVelo, nRadius, nAtomUCNumel);
 
 % Background gas particle matrix
 bgMatrix = zeros(nVelo, nFieldsVelo, nRadius);
 
+
+%% Fill initial matrices
+
+for iRadius = 1 : (nRadius - 1)
+    % Calculate bin volumes and background particle density per bin
+    binVolume = (4/3)*pi ...
+                * ( (radius(iRadius + 1))^3 ...
+                - (radius(iRadius))^3 )     ...
+                * ( cosd(angle(iAngle))     ...
+                - cosd(angle(iAngle + 1)) ); % Bin volume [m^3]
+
+    % Insert number of background particles per bin
+    bgMatrix(1, Field.nParticles, iRadius) = bgDensity * binVolume;
+end
+
+%% Calculations
 for iAngle = 1 : nAngle
     %% Main program per angle
     % Initiate number of atoms
     nParticleAngle = nParticleMin;
     
     % Number of atoms at current angle
-    if nParticleAngleInit(iAngle) > nParticleMin
-        nParticleAngle = nParticleAngleInit(iAngle);
+    if nParticleAngleArray(iAngle) > nParticleMin
+        nParticleAngle = nParticleAngleArray(iAngle);
     end
     
     % Calculate the initial particle velocity distribution
@@ -259,40 +293,24 @@ for iAngle = 1 : nAngle
         saveVelDitInit = false;
     end
     
-    plasmaMatrix(:, Field.nParticles, 1) = nParticleVeloInit;
+    % Fill plume particle matrix with the initial number of particles
+    for atom = 1 : nAtomUCNumel
+        plasmaMatrix(:, Field.nParticles, 1, atom) = nParticleVeloInit(:, atom);
+    end
     
     for iTime = 1 : nTime
         %% Main program per timestep
         
-        for iRadius = 1 : nRadius
+        for iRadius = 1 : (nRadius - 1)
             %% Main program per radial bin
             
-            % Calculate bin volumes and background particle density per bin
-            binVolume = (4/3)*pi ...
-                * ( (radius(iRadius + 1))^3 ...
-                - (radius(iRadius))^3 ) ...
-                * ( cosd(angle(iAngle)) ...
-                - cosd(angle(iAngle + 1)) ); % Bin volume [m^3]
-
-            % Background particle density per bin
-            bgBinNParticle = bgDensity * binVolume;
-
-            % Insert in background particle matrix
-            bgMatrix(1, Field.nParticles, iRadius) = bgBinNParticle;
-            
             % Loop though velocity bins from highest to lowest
-            for iVelo = numel(veloBins) : -1 : 1
+            for iVelo = nVelo : -1 : 1
                 %% Main program per velocity bin
                 
-                % Store matrix properties in variables
-                nPlasma     = plasmaMatrix(iVelo, Field.nParticles, iRadius);
-                nBg         = bgMatrix(iVelo, Field.nParticles, iRadius);
-                
-                % Average distance traveled in this time step
-                radiusTraveled = veloBins(iVelo) * timeDelta;
-                
-                % Number of radius bins traveles
-                nRadiusBinTraveled = radiusTraveled / radiusDelta;
+                % Number of radius bins traveled on average in this
+                % time step
+                nRadiusBinTraveled = (velo(iVelo) * timeDelta) / radiusDelta;
                 
                 % Limit number of traveled radius bins to prevent index
                 % out-of-bounds error
@@ -300,19 +318,25 @@ for iAngle = 1 : nAngle
                     nRadius = nRadius - 1;
                 end
                 
-                % If the bin has not enough particles and the particle has 
-                % not traveled far enough to reach another bin
-                if (nPlasma < nParticleMin) && (nRadiusBinTraveled < 1)
-                    colChanceStatic     = zeros(1, nRadiusBinTraveled);
-                    colChanceKinetic    = zeros(1, nRadiusBinTraveled);
-                % If bin has enough particles
-                else
-                    % Loop through distance traveled in steps radiusDelta
-                    for iRadiusDelta = iRadius : nRadiusBinTraveled
-                        % Calculate collision probability per radius bin
-                        
-                    end % For radiusDelta
-                end % If number of particles
+                % Loop through species in plasma
+                for species = 1 : nAtomUCNumel
+                    % If the bin has not enough particles and the particle
+                    % has not traveled far enough to reach another bin
+                    if (plasmaMatrix(iVelo, Field.nParticles, iRadius, ...
+                                species) < nParticleMin) ...
+                            && (nRadiusBinTraveled < 1)
+                        colChanceStatic     = zeros(1, nRadiusBinTraveled);
+                        colChanceKinetic    = zeros(1, nRadiusBinTraveled);
+                    % If bin has enough particles and traveled to another
+                    % bin
+                    else
+                        % Loop through distance traveled in steps radiusDelta
+                        for iRadiusDelta = iRadius : nRadiusBinTraveled
+                            % Calculate collision probability per radius bin
+
+                        end % For radiusDelta
+                    end % If number of particles
+                end % For species in plume
             end % For velocity
         end % For radius
     end % For time

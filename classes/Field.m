@@ -5,6 +5,9 @@ classdef Field < uint32
     enumeration
         nParticles  (1)
         nCollisions (2)
+        O           (1)
+        B           (2)
+        A           (3)
     end
 end
 
