@@ -44,13 +44,13 @@ fileName    = 'config';         % File name of configuration file
 % Add comment to output file
 commentString = [...
     'Type whatever you want here. For example, this script was the ' ...
-    'worst sturctured code I have ever seen.' ...
+    'worst structured code I have seen.' ...
     ];
 
 %% Plot settings
 createConfigBool    = false;    % Create a configuration file
 plotVelDisInit      = true;    % Plot initial velocity distribution
-saveVelDisInit      = false;    % Save the initial velocity distribution plot
+saveVelDisInit      = true;    % Save the initial velocity distribution plot
 
 %% Create class instances holding constants and material properties
 C   = PhysicalConstants;
@@ -77,8 +77,8 @@ timeDelta   = 1E-7;     % Time step duration [s]
 % Radial limits
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
-% radiusDelta = 0.5E-4;   % Spatial step size [m]
-radiusDelta = 0.001;
+radiusDelta = 0.5E-4;   % Spatial step size [m]
+% radiusDelta = 0.001;
 
 % Angular limits
 angleMin    = 0;        % Start angle [deg]
@@ -87,64 +87,144 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Velocity limits
 veloMin         = 0;                        % Minimal initial velocity
-veloMax         = 5E4;                      % Maximal initial velocity
+veloMax         = 7E4;                    % Maximal initial velocity
 veloDelta       = radiusDelta / timeDelta;  % Velocity delta to move to next velocity bin
-veloStepsize    = 1;                        % Velocity step size (veloMin : (veloDelta/veloStepsize) : V_Max)
+veloStepsize    = 5;                        % Velocity step size (veloMin : (veloDelta/veloStepsize) : V_Max)
 
 %--------------------------------------------------------------------------
 % Material settings
 %--------------------------------------------------------------------------
 
+% Specified target density [kg / m^3]
+% Set to 0 for single crystal target
+targetDensity   = 2910;
+% targetDensity = 0;
+
 % Unit cell
-uc              = UC.TiO2;  
-atomUC          = uc.ELEMENTS;      % Atoms in unit cell
-nAtomUC         = uc.AMOUNT;        % Amount of each atom in unit cell [A B O]
+uc = [UC.Li4Ti5O12 UC.SrTiO3];    % Array holding unit cells in target
+% uc = UC.LiTi2O4;
+% uc = UC.Li4Ti5O12;
+
+% Mixture ratio of species in target
+ucRatio           = [1 3];
+
+% Set ratio to 1 for one component target
+if numel(uc) == 1
+	ucRatio = 1;
+end
+
+% Check if number of given materials in target if the same as the number of
+% elements in the mixture ratio array
+if numel(uc) ~= numel(ucRatio)
+    error(['Number of elements of mixture ratio array must be the ' ...
+           'same as the unit cell array.']);
+end
+
+ucNumel         = numel(ucRatio);
+
+% % Initialize atom arrays
+atomUC          = [];
+atomUCTemp      = [];
+nAtomUCTemp     = [];
+ucVolume        = zeros(1, ucNumel);
+
+% Fill atom arrays
+for i = 1 : numel(uc)
+    atomUCTemp  = [atomUCTemp   uc(i).ELEMENTS];
+    nAtomUCTemp = [nAtomUCTemp  (uc(i).AMOUNT .* ucRatio(i))];
+    ucVolume(i) = uc(i).VOLUME;
+end
+
+% Normalize atom amount array
+nAtomUCTemp = nAtomUCTemp ./ sum(ucRatio);
+nAtomUCTemp = nAtomUCTemp ./ min(nAtomUCTemp);
+
+% Initialize atom number array
+elementNumberTemp = zeros(1, numel(atomUCTemp));
+
+% Fill atom number array
+for i = 1 : numel(atomUCTemp)
+    elementNumberTemp(i) = atomUCTemp(i).NUMBER;
+end
+
+% Get sorted unique atom array
+[elementNumber, elementIndex, ~] = unique(elementNumberTemp, 'sorted');
+
+% Check if there is oxygen
+if ~isempty(elementNumber(elementNumber == 8))
+    % Place oxygen at the end of the atom array
+    elementIndex(end + 1)               = elementIndex(elementNumber == 8);
+    % Remove from old array
+    elementIndex(elementNumber == 8)    = [];
+end
+
+% Initialize amount of atom array
+nAtomUC = zeros(1, numel(elementNumber));
+
+% Look through unique atoms
+for i = 1 : numel(elementNumber)
+    % Insert unique atoms in array
+    atomUC      = [atomUC atomUCTemp(elementIndex(i))];
+    % Insert the calculated ratio of each atom in atom amount array
+    nAtomUC(i)  = sum(nAtomUCTemp(elementNumberTemp == atomUC(i).NUMBER));
+end
+
 nAtomUCNumel    = numel(nAtomUC);
 nAtomUCSum      = sum(nAtomUC);
-ucVolume        = uc.VOLUME;        % Volume of unit cell [m^3]
 
-% Select A and B atoms  
-massA = atomUC(1).MASS;     % Mass A atom [kg]
-massB = atomUC(2).MASS;     % Mass B atom [kg]
-massO = atomUC(end).MASS;   % Mass O atom [kg]
+% Single crystal density as weighted average of the components in the target [kg / m^3]
+scDensity = 0;
+for i = 1 : numel(uc)
+    scDensity = scDensity + (uc(i).DENSITY * ucRatio(i));
+end
+scDensity = scDensity / sum(ucRatio);
 
-% Array holding all possible plume compounds
-massArray = [ massA ...               % atomic lithium        [Li +1]
-              massB ...               % atomic titanium       [Ti +4]
-              massO ...               % atomic oxygen         [O -2]
-              2*massA ...             % dilithium             [Li2 +2]
-              2*massO ...             % molecular oxygen      [O2]
-              massA + massO ...       % lithium monoxide      [LiO -1]
-              2*massA + massO ...     % lithium oxide         [Li2O]
-              2*massA + 2*massO ...   % lithium peroxide      [Li2O2 -2]
-              4*massO ...             % tetraoxygen           [O4 -4]
-              massB + massO ...       % titanium(II) oxide    [TiO +2]
-              massB + 2*massO ...     % titanium dioxide      [TiO2]
-              2*massB + massO ...     % dititanium monooxide  [Ti2O +6]
-              2*massB + 3*massO ...   % titanium(III) oxide   [Ti2O3 +2]
-              3*massB + massO  ...    % trititanium oxide     [Ti3O +10]
-              3*massB + 5*massO       % trititanium pentoxide [Ti3O5 +2]
-            ];
-nSpecies = numel(massArray);
+% Calculate target density ratio compared to single crystal density
+if targetDensity
+    densityRatio = targetDensity / scDensity;
+else
+    densityRatio = 1;
+end
 
-% Atomic radii [m]
-% Assume a molecule has atomic radii of the sum of its components
-radiusA     = atomUC(1).MASS;   % A atom: lithium
-radiusB     = atomUC(2).MASS;   % B atom: titanium
-radiusO     = atomUC(end).MASS; % Oxygen atom
-radiusBG    = 2*PT.O.RADIUS;    % Background gas molecule
-
-% Collision cross section array of plume species with background gas molecule [m2]
-Sigma_Bg = (([ radiusA ...                  % A-O2
-               radiusB ...                  % B-O2
-               radiusO ...                  % O-O2
-               (radiusA + radiusO) ...      % AO-O2
-               (radiusB + radiusO) ...      % BO-O2
-               (radiusB + 2*radiusO) ...    % BO2-O2
-             ] + radiusBG).^2) .* pi;
-
-% Formation energy of monoclinic Li4Ti5O12 [J] (get spinel value)
-energyFormation  = uc.ENERGY_FORMATION;
+% % Select A and B atoms  
+% massA = atomUC(1).MASS;     % Mass A atom [kg]
+% massB = atomUC(2).MASS;     % Mass B atom [kg]
+% massO = atomUC(end).MASS;   % Mass O atom [kg]
+% 
+% % Array holding all possible plume compounds
+% massArray = [ massA ...               % atomic lithium        [Li +1]
+%               massB ...               % atomic titanium       [Ti +4]
+%               massO ...               % atomic oxygen         [O -2]
+%               2*massA ...             % dilithium             [Li2 +2]
+%               2*massO ...             % molecular oxygen      [O2]
+%               massA + massO ...       % lithium monoxide      [LiO -1]
+%               2*massA + massO ...     % lithium oxide         [Li2O]
+%               2*massA + 2*massO ...   % lithium peroxide      [Li2O2 -2]
+%               4*massO ...             % tetraoxygen           [O4 -4]
+%               massB + massO ...       % titanium(II) oxide    [TiO +2]
+%               massB + 2*massO ...     % titanium dioxide      [TiO2]
+%               2*massB + massO ...     % dititanium monooxide  [Ti2O +6]
+%               2*massB + 3*massO ...   % titanium(III) oxide   [Ti2O3 +2]
+%               3*massB + massO  ...    % trititanium oxide     [Ti3O +10]
+%               3*massB + 5*massO       % trititanium pentoxide [Ti3O5 +2]
+%             ];
+% nSpecies = numel(massArray);
+% 
+% % Atomic radii [m]
+% % Assume a molecule has atomic radii of the sum of its components
+% radiusA     = atomUC(1).MASS;   % A atom: lithium
+% radiusB     = atomUC(2).MASS;   % B atom: titanium
+% radiusO     = atomUC(end).MASS; % Oxygen atom
+% radiusBG    = 2*PT.O.RADIUS;    % Background gas molecule
+% 
+% % Collision cross section array of plume species with background gas molecule [m2]
+% Sigma_Bg = (([ radiusA ...                  % A-O2
+%                radiusB ...                  % B-O2
+%                radiusO ...                  % O-O2
+%                (radiusA + radiusO) ...      % AO-O2
+%                (radiusB + radiusO) ...      % BO-O2
+%                (radiusB + 2*radiusO) ...    % BO2-O2
+%              ] + radiusBG).^2) .* pi;
 
 % Target properties
 absorption          = 0.66; % Adsorption coefficient SrTiO3 (check value)
@@ -185,7 +265,7 @@ ablationVolume  = spotWidth * spotHeight * ablationDepth;
 energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 
 % Unit cell
-energyBinding = energyFormation;    % Binding energy crystal [J]
+% energyBinding = energyFormation;    % Binding energy crystal [J]
 
 % Dimensional axis
 angle   = angleMin  : angleDelta                : angleMax - angleDelta;   % Angular axis
@@ -203,14 +283,23 @@ nVelo   = numel(velo);
 %% Initial ditribution
 % Number of ablated unit cells
 % nUCAblated = (ablationVolume / ucVolume) / nAtomUCSum; % Tom
-nUCAblated      = ablationVolume / ucVolume;    % Number of ablated unit cells
-nAtomAblated    = nUCAblated * nAtomUCSum;      % Number of ablated atoms
+
+% Number of ablated unit cells
+% nUCAblated = (ablationVolume / ucVolume) * densityRatio;
+nUCAblated = (ablationVolume .* (ucRatio / sum(ucRatio)) ./ ucVolume) .* densityRatio;
+
+% Number of ablated atoms
+% nAtomAblated = nUCAblated * nAtomUCSum;
+nAtomAblated = 0;
+for i = 1 : numel(uc)
+    nAtomAblated = nAtomAblated + (nUCAblated(i) * sum(uc(i).AMOUNT));
+end
 
 % Pre-allocate memory
-nParticleAngleArray = zeros(1, nAngle - 1);
+nParticleAngleArray = zeros(1, nAngle);
 
 % Compute initial angular particle distribution (eq. 5)
-for iAngle = 1 : nAngle
+for iAngle = 1 : (nAngle - 1)
     nParticleAngleArray(iAngle) = ((4/3)*pi * radiusDelta^3) ...
         .* abs( cosd(angle(iAngle + 1)) - cosd(angle(iAngle)) ) ...
         .* cosd(angle(iAngle)).^cosPowerFit;
@@ -271,7 +360,7 @@ for iRadius = 1 : (nRadius - 1)
 end
 
 %% Calculations
-for iAngle = 1 : nAngle
+for iAngle = 1 : 1 % nAngle
     %% Main program per angle
     % Initiate number of atoms
     nParticleAngle = nParticleMin;
@@ -283,8 +372,8 @@ for iAngle = 1 : nAngle
     
     % Calculate the initial particle velocity distribution
     nParticleVeloInit = initialVelocityDistribution( plotVelDisInit, ...
-        saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ...
-        energyLaser, energyBinding, heatTarget, absorption, nParticleAngle );
+        saveVelDisInit, velo, veloDistributionWidth, nUCAblated, uc, ucRatio, ...
+        energyLaser, heatTarget, absorption, nParticleAngle, densityRatio );
     
     % Only plot and save initial particle velocity distribution for the
     % center of the plume
@@ -295,49 +384,49 @@ for iAngle = 1 : nAngle
     
     % Fill plume particle matrix with the initial number of particles
     for atom = 1 : nAtomUCNumel
-        plasmaMatrix(:, Field.nParticles, 1, atom) = nParticleVeloInit(:, atom);
+%         plasmaMatrix(:, Field.nParticles, 1, atom) = nParticleVeloInit(:, atom);
     end
     
-    for iTime = 1 : nTime
-        %% Main program per timestep
-        
-        for iRadius = 1 : (nRadius - 1)
-            %% Main program per radial bin
-            
-            % Loop though velocity bins from highest to lowest
-            for iVelo = nVelo : -1 : 1
-                %% Main program per velocity bin
-                
-                % Number of radius bins traveled on average in this
-                % time step
-                nRadiusBinTraveled = (velo(iVelo) * timeDelta) / radiusDelta;
-                
-                % Limit number of traveled radius bins to prevent index
-                % out-of-bounds error
-                if nRadiusBinTraveled > (nRadius - 1)
-                    nRadius = nRadius - 1;
-                end
-                
-                % Loop through species in plasma
-                for species = 1 : nAtomUCNumel
-                    % If the bin has not enough particles and the particle
-                    % has not traveled far enough to reach another bin
-                    if (plasmaMatrix(iVelo, Field.nParticles, iRadius, ...
-                                species) < nParticleMin) ...
-                            && (nRadiusBinTraveled < 1)
-                        colChanceStatic     = zeros(1, nRadiusBinTraveled);
-                        colChanceKinetic    = zeros(1, nRadiusBinTraveled);
-                    % If bin has enough particles and traveled to another
-                    % bin
-                    else
-                        % Loop through distance traveled in steps radiusDelta
-                        for iRadiusDelta = iRadius : nRadiusBinTraveled
-                            % Calculate collision probability per radius bin
-
-                        end % For radiusDelta
-                    end % If number of particles
-                end % For species in plume
-            end % For velocity
-        end % For radius
-    end % For time
+%     for iTime = 1 : nTime
+%         %% Main program per timestep
+%         
+%         for iRadius = 1 : (nRadius - 1)
+%             %% Main program per radial bin
+%             
+%             % Loop though velocity bins from highest to lowest
+%             for iVelo = nVelo : -1 : 1
+%                 %% Main program per velocity bin
+%                 
+%                 % Number of radius bins traveled on average in this
+%                 % time step
+%                 nRadiusBinTraveled = (velo(iVelo) * timeDelta) / radiusDelta;
+%                 
+%                 % Limit number of traveled radius bins to prevent index
+%                 % out-of-bounds error
+%                 if nRadiusBinTraveled > (nRadius - 1)
+%                     nRadius = nRadius - 1;
+%                 end
+%                 
+%                 % Loop through species in plasma
+%                 for species = 1 : nAtomUCNumel
+%                     % If the bin has not enough particles and the particle
+%                     % has not traveled far enough to reach another bin
+%                     if (plasmaMatrix(iVelo, Field.nParticles, iRadius, ...
+%                                 species) < nParticleMin) ...
+%                             && (nRadiusBinTraveled < 1)
+%                         colChanceStatic     = zeros(1, nRadiusBinTraveled);
+%                         colChanceKinetic    = zeros(1, nRadiusBinTraveled);
+%                     % If bin has enough particles and traveled to another
+%                     % bin
+%                     else
+%                         % Loop through distance traveled in steps radiusDelta
+%                         for iRadiusDelta = iRadius : nRadiusBinTraveled
+%                             % Calculate collision probability per radius bin
+% 
+%                         end % For radiusDelta
+%                     end % If number of particles
+%                 end % For species in plume
+%             end % For velocity
+%         end % For radius
+%     end % For time
 end % For angle

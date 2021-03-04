@@ -17,10 +17,6 @@ extended by Sam Borkent to improve readability and performance and to
 include two metals with highly different masses (Li4Ti5O12).
 
 # Assumptions
-* The target material is completely oxidized. Most oxide targets are 
-    specified with a variable amount of oxygen in the unit cell (e.g.
-    SrTiOx). This model assumes no oxygen vacancies or excess in the
-    target. (e.g. SrTiO3, Li4Ti5O12)
 * The excitation energy of the atoms in the unit cell are neglected
 * Identical particles are assumed to seperate in space due to their
     initial velocity distribution, thus collisions between identical
@@ -47,7 +43,14 @@ Field names and corresponding index value: (see Field enumeration class)
 * Field.nCollisions (2)     Number of collisions
 * Field.O           (1)     Oxygen
 
+# Issues
+* When making crazy composite targets, lithium gain too much energy
+
 # Change log
+
+04-03-21:
+* Implemented target density
+* Implemented mixture targets
 
 27-02-21:
 * Added memory check to prevent program from running if not enough memory
@@ -124,11 +127,11 @@ Field names and corresponding index value: (see Field enumeration class)
 * Made make dir conditional so it is skipped if dir already exists
 * Add date and time to config file
 
-# Issues
-* Number of particles in initialVelocityDistribution is
-    a factor 10 too high
-
 # To do
+* Remove code that is unnecessary
+* Implement excitation energy
+* Preacclocate object arrays
+* Add correcting to unit cell volume for non-right angles
 * Make fill inital plume and background matrix a function
 * Implement folder selection into initialVelocityDistribution save feature
 * Get correct formation energy of cubic spinel Li4Ti5O12 target
@@ -142,6 +145,8 @@ Field names and corresponding index value: (see Field enumeration class)
 * Check oxidation energies
 * Check angular fitting parameter
 * Check which data is relevant to print in config file
+* Get materials data straight from PeriodicTable and MaterialsProject
+    websites
 
 # Questions
 * Why are all the array's in the Makestruct function doubled?
