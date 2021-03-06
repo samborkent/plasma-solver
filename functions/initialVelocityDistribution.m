@@ -105,7 +105,8 @@ for i = 1 : numel(uc)
                 plot(velo, nParticleVeloInit(:, atom), ...
                     'DisplayName', uc(i).ELEMENTS(atom).SYMBOL);
 %                 bar(velo, nParticleVeloInit(:, atom), 'stacked', ...
-%                     'LineStyle', 'none', 'DisplayName', uc(i).ELEMENTS(atom).SYMBOL);
+%                     'LineStyle', 'none', ...
+%                     'DisplayName', uc(i).ELEMENTS(atom).SYMBOL);
             end % If plotBool
         end % If there are any atoms
     end % For atoms in target component

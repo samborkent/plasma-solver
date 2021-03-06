@@ -45,6 +45,11 @@ Field names and corresponding index value: (see Field enumeration class)
 
 # Change log
 
+06-03-21:
+* Restructure main loops to only excecute code when necessary. Angles get
+    skipped if number of particles per angle is smaller than minimum
+    number of particles per angle.
+
 04-03-21:
 * Implemented target density
 * Implemented mixture targets
@@ -132,27 +137,25 @@ Field names and corresponding index value: (see Field enumeration class)
 * Make fill inital plume and background matrix a function
 * Implement folder selection into initialVelocityDistribution save feature
 * Get correct formation energy of cubic spinel Li4Ti5O12 target
-* Check which Li, Ti, and O molecules forms in the PLD plasma plume
-* Check initial particle velocity distribution width
-* Check restriction values
-* Check ablation depth in target
-* Check absorption coefficient value (Temp and photon energy dependend)
-* Check crystal binding energy
-* Check activation energies
-* Check oxidation energies
-* Check angular fitting parameter
-* Check which data is relevant to print in config file
 * Get materials data straight from PeriodicTable and MaterialsProject
     websites
+* Atomatically determine non-ionized oxidation states in plasma plume
+
+# To validate
+* Species that form in plasma plume
+* Angular fitting parameter
+* Initial particle velocity distribution width
+* Restriction values
+* Ablation depth in target
+* Absorption coefficient (Temp and photon energy dependend)
+* Activation energies
+* Oxidation energies
+* Which data to print in config file
 
 # Questions
+* Why does the first angle bin not have the largest number of particles?
 * Why are all the array's in the Makestruct function doubled?
     Example: V = [0 20000 40000 0 20000 40000]
-* Why is the crystal binding energy 5x the formation energy?
-* What is the target density, and why is it 1?
 * Why are O2 and Ti2O3 not included in mass array?
 * Why is only the activation energy of TiO listed, and not of SrO or
   O2?
-* Where does the 0.9 come from in Tom's average velocity?
-* Why is the total number of ablated unit cells divided by the number of
-    atoms in the unit cell?
