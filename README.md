@@ -14,14 +14,22 @@ to improve readability and performance and to support targets of any
 composition.
 
 # Assumptions
-* The excitation energy of the atoms in the unit cell are neglected
+* The excitation energy of the atoms in the unit cell are neglected.
 * Identical particles are assumed to seperate in space due to their
     initial velocity distribution, thus collisions between identical
-    particles are neglected
+    particles are neglected.
 * The background gas starts out with zero velocity, as the room tempreature
     velocity is aroung 400 m/s, which is two orders smaller than the plume
     particle velocities. The particles in the background gas don't have a
     preferential direction, so their average velocity zeros out.
+* Only head-on collisions are included, so there is no net exchange of
+    particles between angular bins.
+* Particles can only gain positive momentum, when a lighter plasma particle
+    collides with a heavier background gas particle its momentum is set to
+    zero, and the background gas particle gains a little momentum, so
+    momentum is not conserved.
+* Collisions are only possible if the background particles move slower than
+    the plume particles
 
 # Naming conventions
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
@@ -44,6 +52,9 @@ Field names and corresponding index value: (see Field enumeration class)
 * When making crazy composite targets, lithium gain too much energy
 
 # Change log
+
+09-03-21:
+* Worked on main loop, made start with collisions, no propagation yet
 
 06-03-21:
 * Restructure main loops to only excecute code when necessary. Angles get
@@ -130,6 +141,8 @@ Field names and corresponding index value: (see Field enumeration class)
 * Add date and time to config file
 
 # To do
+* Make the model work without collisions or oxidation
+* Replace divisions that are performed often with multiplications
 * Remove code that is unnecessary
 * Implement excitation energy
 * Preacclocate object arrays

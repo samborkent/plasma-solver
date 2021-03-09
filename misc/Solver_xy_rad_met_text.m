@@ -60,8 +60,8 @@
 clear all
 clearvars -except files nn
 close all
-profile off % on  for optimalization testing
-warning('OFF')
+profile on % on  for optimalization testing
+% warning('OFF')
 
 
 %% init starting conditions
@@ -105,7 +105,7 @@ T_delta = 1E-7;             %Timestep in [s]
 X_begin = 0;                %begin distance in [m]
 X_end = 0.06;               %end X distance in [m]
 % X_delta = 0.5E-4;           %Distance stepsize in [m]
-X_delta = 0.005;
+X_delta = 0.0005;
 
 % angle settings
 Rad_start = 0;              %Start angle in [deg]
@@ -222,7 +222,7 @@ fclose(fid);
 %% Begin calculations for all angles
 %--------------------------------------------------------------------------
 
-for rad = Rad_start+Rad_delta: Rad_delta : Rad_stop
+for rad = Rad_start+Rad_delta %: Rad_delta : Rad_stop
     
     %% Setup initial conditions
     %--------------------------------------------------------------------------
@@ -410,118 +410,118 @@ for rad = Rad_start+Rad_delta: Rad_delta : Rad_stop
                         else
                             %if distance is expected to be traveled
                             for n_nbg = 1:S_exp
-                                %calculate per X_delta the colision probability
-                                % if the distance is smaller then the step size
-                                if x+n_nbg-1 > ((X_end-X_begin)/X_delta)
-                                    R_kans_botsen_st_exp(n_nbg) = 0;
-                                    R_kans_botsen_mo_exp(n_nbg) = 0;
-                                    N_temp_left(n_nbg+1) = N_temp_left(n_nbg);
-                                    R_kans_bots_st(n_nbg) = 0;
-                                    R_kans_bots_mo(n_nbg) = 0;
-                                    Vbg_min_mo(n_nbg) = 0;
-                                    S_st(n_nbg) = 0;
-                                    S_mo(n_nbg) = 0;
-                                    Sbg_st(n_nbg) = 0;
-                                    Sbg_mo(n_nbg) = 0;
-                                else
-                                    % Left off
-                                    try
-                                        N_loc = M.(x_names{x+n_nbg-1}).N;
-                                    catch
-                                        N_loc(n_nbg) = 0;
-                                    end
-                                    %calculatug amount of particles in background
-                                    Nbg_exp_V = (Mbg.(x_names{x+n_nbg-1}).N)/(Mbg.(x_names{x+n_nbg-1}).VOL);%denisty background
-                                    Nbg_exp_N = (Mbg.(x_names{x+n_nbg-1}).N);%number N atoms
-                                    %calculating ht eamount of partciels in the plasma
-                                    Nbg_exp = Nbg_exp_N; %+sum(Np_exp);
-                                    %calculate colision probability
-                                    R_kans_botsen_st_exp(n_nbg) = Nbg_exp_V(1).*N_temp_left(n_nbg)/(sum((N_loc))+N_temp_left(n_nbg))*(Opp_plasma(P_local+1))*X_delta; %only valid if density plasma is lower than background?
-                                    R_kans_botsen_mo_exp(n_nbg) = Nbg_exp_V(2).*N_temp_left(n_nbg)/(sum((N_loc))+N_temp_left(n_nbg))*(Opp_plasma(P_local+1))*X_delta;
-                                    %R_kans_botsen_mo_exp(n_nbg)=0;
-                                    nanis = find(isnan(R_kans_botsen_st_exp))';
-                                    R_kans_botsen_st_exp(nanis) = 0;
-                                    nanis = find(isnan(R_kans_botsen_mo_exp))';
-                                    R_kans_botsen_mo_exp(nanis) = 0;
-                                    %                      nanis = find(isnan(R_kans_botsen_pl_exp))';
-                                    %retreive background velocity
-                                    Vbg_exp = (Mbg.(x_names{x+n_nbg-1}).V);
-                                    % no colisions if the velocity is slower than the background velocity
-                                    if Vbg_exp(2) > V_local_dist
-                                        Nbg_exp(2) = 0;
-                                    end
-                                    %calculate the amont of collided atoms
-                                    R_kans_bots_st(n_nbg) = R_kans_botsen_st_exp(n_nbg)*N_temp_left(n_nbg)*Nbg_exp(1)/sum(Nbg_exp);
-                                    R_kans_bots_mo(n_nbg) = R_kans_botsen_mo_exp(n_nbg) *N_temp_left(n_nbg)*Nbg_exp(2)/sum(Nbg_exp);
-                                    %cap if no more particles present in the background
-                                    if R_kans_bots_mo(n_nbg) > Nbg_exp_N(2)
-                                        R_kans_bots_mo(n_nbg) = Nbg_exp_N(2);
-                                    end
-                                    if R_kans_bots_st(n_nbg) > Nbg_exp_N(1)
-                                        R_kans_bots_st(n_nbg) = Nbg_exp_N(1);
-                                    end
-                                    if Vbg_exp(2) > V_local_dist
-                                        R_kans_bots_mo(n_nbg) = 0;
-                                    end
-                                    
-                                    %end of cap if no more particles present in the background
-                                    nanis = find(isnan(R_kans_bots_st))';
-                                    R_kans_bots_st(nanis) = 0;
-                                    nanis = find(isnan(R_kans_bots_mo))';
-                                    R_kans_bots_mo(nanis) = 0;
-                                    
-                                    %calculate the not collided plasma particles
-                                    lost = ( R_kans_bots_st(n_nbg)    + R_kans_bots_mo(n_nbg)  ); %+ % sumR_kans_bots_pl:,n_nbg
-                                    if lost > N_temp_left(n_nbg)
-                                        temp_R_st = R_kans_bots_st(n_nbg)/sum(R_kans_bots_st(n_nbg) + R_kans_bots_mo(n_nbg)) * N_temp_left(n_nbg);
-                                        temp_R_mo = R_kans_bots_mo(n_nbg)/sum(R_kans_bots_st(n_nbg) + R_kans_bots_mo(n_nbg)) * N_temp_left(n_nbg);
-                                        R_kans_bots_st(n_nbg) = temp_R_st;
-                                        R_kans_bots_mo(n_nbg) = temp_R_mo;
-                                        lost = N_temp_left(n_nbg);
-                                    end
-                                    
-                                    nanis = find(isnan(lost))';
-                                    lost(nanis) = 0;
-                                    N_temp_left(n_nbg+1) = N_temp_left(n_nbg)- lost;
-                                    
-                                    %calculate plasma verlocities after collisions
-                                    V_min_mo = ((m_p(P_local+1)-m_p(2))*V_local_dist+2*m_o*(Vbg_exp(1)))/((m_p(P_local+1)+m_p(2)));
-                                    V_min_st = ((m_p(P_local+1)-m_p(2))*V_local_dist+2*m_o*Vbg(1))/(m_p(P_local+1)+m_p(2));
-                                    V_min_mo = V_local_dist;
-                                    
-                                    %Round on stepsize
-                                    V_min_st = round(V_min_st/(X_delta/T_delta))*(X_delta/T_delta);
-                                    V_min_mo = round(V_min_mo/(X_delta/T_delta))*(X_delta/T_delta);
-                                   
-                                    if Vbg_exp(2) > V_local_dist
-                                        V_min_mo = 0;
-                                    end
-                                    
-                                    if V_local_dist > sqrt(5.2*1.6E-19/m_c*2) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
-                                        P_local_temp = 2 ;
-                                    else
-                                        P_local_temp = P_local;
-                                    end
-                                    
-                                    %calculate background verlocities after collisions
-                                    Vbg_min_st = ((m_o-m_p(P_local_temp+1))*0+2*m_p(P_local_temp+1)*V_local_dist)/(m_p(P_local_temp+1)+m_o);
-                                    Vbg_min_mo(n_nbg) = round(((m_o-m_p(P_local_temp+1))*Vbg_exp(2)+2*m_p(P_local_temp+1)*V_local_dist)/(m_p(P_local_temp+1)+m_o)/(X_delta/T_delta))*(X_delta/T_delta);
-                                   
-                                    %calculate traveled distance
-                                    S_st(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+V_min_st*T_delta*(S_exp-n_nbg)/S_exp;
-                                    S_mo(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+V_min_mo*T_delta*(S_exp-n_nbg)/S_exp;
-                                   
-                                    Sbg_st(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+Vbg_min_st*T_delta*(S_exp-n_nbg)/S_exp;  %aftand waar hij begint + die hij af
-                                    Sbg_mo(n_nbg) = Vbg_exp(2)*T_delta*n_nbg/S_exp+Vbg_min_mo(n_nbg)*T_delta*(S_exp-n_nbg)/S_exp;
-                                    %round calculated distance to X_delta and set the
-                                end %end if x+n_nbg-1 > ((X_end-X_begin)/X_delta)
-                                %starting point offset
-                                x_new_bots_st = round(S_st/X_delta)*X_delta+X;       % plasma For collisions with the standing Background
-                                x_new_bots_mo = round(S_mo/X_delta)*X_delta+X;       % plasma For collisions with the moving Background
-                                x_newbg_bots_st = round(Sbg_st/X_delta)*X_delta+X;    % standing background For collisions with the plasma
-                                x_newbg_bots_mo = round(Sbg_mo/X_delta)*X_delta+X;    % moving background For collisions with the plasma
-                                nanis = find(isnan(x_newbg_bots_mo))';
-                                x_newbg_bots_mo(nanis) = 0;
+%                                 %calculate per X_delta the colision probability
+%                                 % if the distance is smaller then the step size
+%                                 if x+n_nbg-1 > ((X_end-X_begin)/X_delta)
+%                                     R_kans_botsen_st_exp(n_nbg) = 0;
+%                                     R_kans_botsen_mo_exp(n_nbg) = 0;
+%                                     N_temp_left(n_nbg+1) = N_temp_left(n_nbg);
+%                                     R_kans_bots_st(n_nbg) = 0;
+%                                     R_kans_bots_mo(n_nbg) = 0;
+%                                     Vbg_min_mo(n_nbg) = 0;
+%                                     S_st(n_nbg) = 0;
+%                                     S_mo(n_nbg) = 0;
+%                                     Sbg_st(n_nbg) = 0;
+%                                     Sbg_mo(n_nbg) = 0;
+%                                 else
+%                                     % Left off
+%                                     try
+%                                         N_loc = M.(x_names{x+n_nbg-1}).N;
+%                                     catch
+%                                         N_loc(n_nbg) = 0;
+%                                     end
+%                                     %calculatug amount of particles in background
+%                                     Nbg_exp_V = (Mbg.(x_names{x+n_nbg-1}).N)/(Mbg.(x_names{x+n_nbg-1}).VOL);%denisty background
+%                                     Nbg_exp_N = (Mbg.(x_names{x+n_nbg-1}).N);%number N atoms
+%                                     %calculating ht eamount of partciels in the plasma
+%                                     Nbg_exp = Nbg_exp_N; %+sum(Np_exp);
+%                                     %calculate colision probability
+%                                     R_kans_botsen_st_exp(n_nbg) = Nbg_exp_V(1).*N_temp_left(n_nbg)/(sum((N_loc))+N_temp_left(n_nbg))*(Opp_plasma(P_local+1))*X_delta; %only valid if density plasma is lower than background?
+%                                     R_kans_botsen_mo_exp(n_nbg) = Nbg_exp_V(2).*N_temp_left(n_nbg)/(sum((N_loc))+N_temp_left(n_nbg))*(Opp_plasma(P_local+1))*X_delta;
+%                                     %R_kans_botsen_mo_exp(n_nbg)=0;
+%                                     nanis = find(isnan(R_kans_botsen_st_exp))';
+%                                     R_kans_botsen_st_exp(nanis) = 0;
+%                                     nanis = find(isnan(R_kans_botsen_mo_exp))';
+%                                     R_kans_botsen_mo_exp(nanis) = 0;
+%                                     %                      nanis = find(isnan(R_kans_botsen_pl_exp))';
+%                                     %retreive background velocity
+%                                     Vbg_exp = (Mbg.(x_names{x+n_nbg-1}).V);
+%                                     % no colisions if the velocity is slower than the background velocity
+%                                     if Vbg_exp(2) > V_local_dist
+%                                         Nbg_exp(2) = 0;
+%                                     end
+%                                     %calculate the amont of collided atoms
+%                                     R_kans_bots_st(n_nbg) = R_kans_botsen_st_exp(n_nbg)*N_temp_left(n_nbg)*Nbg_exp(1)/sum(Nbg_exp);
+%                                     R_kans_bots_mo(n_nbg) = R_kans_botsen_mo_exp(n_nbg) *N_temp_left(n_nbg)*Nbg_exp(2)/sum(Nbg_exp);
+%                                     %cap if no more particles present in the background
+%                                     if R_kans_bots_mo(n_nbg) > Nbg_exp_N(2)
+%                                         R_kans_bots_mo(n_nbg) = Nbg_exp_N(2);
+%                                     end
+%                                     if R_kans_bots_st(n_nbg) > Nbg_exp_N(1)
+%                                         R_kans_bots_st(n_nbg) = Nbg_exp_N(1);
+%                                     end
+%                                     if Vbg_exp(2) > V_local_dist
+%                                         R_kans_bots_mo(n_nbg) = 0;
+%                                     end
+%                                     
+%                                     %end of cap if no more particles present in the background
+%                                     nanis = find(isnan(R_kans_bots_st))';
+%                                     R_kans_bots_st(nanis) = 0;
+%                                     nanis = find(isnan(R_kans_bots_mo))';
+%                                     R_kans_bots_mo(nanis) = 0;
+%                                     
+%                                     %calculate the not collided plasma particles
+%                                     lost = ( R_kans_bots_st(n_nbg)    + R_kans_bots_mo(n_nbg)  ); %+ % sumR_kans_bots_pl:,n_nbg
+%                                     if lost > N_temp_left(n_nbg)
+%                                         temp_R_st = R_kans_bots_st(n_nbg)/sum(R_kans_bots_st(n_nbg) + R_kans_bots_mo(n_nbg)) * N_temp_left(n_nbg);
+%                                         temp_R_mo = R_kans_bots_mo(n_nbg)/sum(R_kans_bots_st(n_nbg) + R_kans_bots_mo(n_nbg)) * N_temp_left(n_nbg);
+%                                         R_kans_bots_st(n_nbg) = temp_R_st;
+%                                         R_kans_bots_mo(n_nbg) = temp_R_mo;
+%                                         lost = N_temp_left(n_nbg);
+%                                     end
+%                                     
+%                                     nanis = find(isnan(lost))';
+%                                     lost(nanis) = 0;
+%                                     N_temp_left(n_nbg+1) = N_temp_left(n_nbg)- lost;
+%                                     
+%                                     %calculate plasma verlocities after collisions
+%                                     V_min_mo = ((m_p(P_local+1)-m_p(2))*V_local_dist+2*m_o*(Vbg_exp(1)))/((m_p(P_local+1)+m_p(2)));
+%                                     V_min_st = ((m_p(P_local+1)-m_p(2))*V_local_dist+2*m_o*Vbg(1))/(m_p(P_local+1)+m_p(2));
+%                                     V_min_mo = V_local_dist;
+%                                     
+%                                     %Round on stepsize
+%                                     V_min_st = round(V_min_st/(X_delta/T_delta))*(X_delta/T_delta);
+%                                     V_min_mo = round(V_min_mo/(X_delta/T_delta))*(X_delta/T_delta);
+%                                    
+%                                     if Vbg_exp(2) > V_local_dist
+%                                         V_min_mo = 0;
+%                                     end
+%                                     
+%                                     if V_local_dist > sqrt(5.2*1.6E-19/m_c*2) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
+%                                         P_local_temp = 2 ;
+%                                     else
+%                                         P_local_temp = P_local;
+%                                     end
+%                                     
+%                                     %calculate background verlocities after collisions
+%                                     Vbg_min_st = ((m_o-m_p(P_local_temp+1))*0+2*m_p(P_local_temp+1)*V_local_dist)/(m_p(P_local_temp+1)+m_o);
+%                                     Vbg_min_mo(n_nbg) = round(((m_o-m_p(P_local_temp+1))*Vbg_exp(2)+2*m_p(P_local_temp+1)*V_local_dist)/(m_p(P_local_temp+1)+m_o)/(X_delta/T_delta))*(X_delta/T_delta);
+%                                    
+%                                     %calculate traveled distance
+%                                     S_st(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+V_min_st*T_delta*(S_exp-n_nbg)/S_exp;
+%                                     S_mo(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+V_min_mo*T_delta*(S_exp-n_nbg)/S_exp;
+%                                    
+%                                     Sbg_st(n_nbg) = V_local_dist*T_delta*n_nbg/S_exp+Vbg_min_st*T_delta*(S_exp-n_nbg)/S_exp;  %aftand waar hij begint + die hij af
+%                                     Sbg_mo(n_nbg) = Vbg_exp(2)*T_delta*n_nbg/S_exp+Vbg_min_mo(n_nbg)*T_delta*(S_exp-n_nbg)/S_exp;
+%                                     %round calculated distance to X_delta and set the
+%                                 end %end if x+n_nbg-1 > ((X_end-X_begin)/X_delta)
+%                                 %starting point offset
+%                                 x_new_bots_st = round(S_st/X_delta)*X_delta+X;       % plasma For collisions with the standing Background
+%                                 x_new_bots_mo = round(S_mo/X_delta)*X_delta+X;       % plasma For collisions with the moving Background
+%                                 x_newbg_bots_st = round(Sbg_st/X_delta)*X_delta+X;    % standing background For collisions with the plasma
+%                                 x_newbg_bots_mo = round(Sbg_mo/X_delta)*X_delta+X;    % moving background For collisions with the plasma
+%                                 nanis = find(isnan(x_newbg_bots_mo))';
+%                                 x_newbg_bots_mo(nanis) = 0;
                             end %n_nbg=1:S_exp
                         end %if S_exp==0
                         %amount of particles that dont collide inside the plasma
@@ -547,348 +547,348 @@ for rad = Rad_start+Rad_delta: Rad_delta : Rad_stop
                             Xbg_n_minb = ['X_' myfastint2str(round(x))];
                         end
                         
-                        %% check moment
-                        % %--------------------------------------------------------------------------
-                        
-                        %% Writing particles into struture M_1 en Mbg
-                        %
-                        % Non coliding particles
-                        %
-                        %--------------------------------------------------------------------------
-                        %de deeltjes die aankomen
-                        if X_TS < cosd(rad-Rad_delta)*x_new_nbots  && X_TS >= cosd(rad-Rad_delta)*X  && R_kans_nbots > 1 && V_local_dist>-1 %&& V_local_dist<8E4
-                            Ek_loc = round(V_local_dist/V_minimaal)+1;
-                            Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_nbots; %aantal,tijd,type
-                        end
-                        %de deeltjes die verdwijnen
-                        if x_new_nbots >= (X_end-X_delta) || x_new_nbots < 0 || R_kans_nbots < 1 %Check if they disappear
-                            
-                        else %if they dont disappear
-                            %Search if the velocity and number of colisions is already
-                            %in the structure
-                            
-                            i_nb_v = (M_1.(X_n_nb).V == V_local_dist);
-                            i_nb_k = (M_1.(X_n_nb).K == K_local);
-                            i_nb_p = (M_1.(X_n_nb).P == P_local);
-                            if isempty(i_nb_v)==0 %snelehid is niet gevonden in de array
-                                loc_nb = find(i_nb_v.*i_nb_k.*i_nb_p == 1) ;%if verlocity and K collisions are equal
-                                if loc_nb > 0 %if there is a location
-                                    N_loc_nb = M_1.(X_n_nb).N(loc_nb); %Amount of particles on the new location
-                                    M_1.(X_n_nb).N(loc_nb) = N_loc_nb+R_kans_nbots; %Add particles to the location
-                                else %If there is no existing data make a new entry
-                                    %adding the data
-                                    i_nb_size = size(M_1.(X_n_nb).V'); %Look at size of the array
-                                    M_1.(X_n_nb).V(i_nb_size(1)+1) = V_local_dist; %add velocity
-                                    M_1.(X_n_nb).N(i_nb_size(1)+1) = R_kans_nbots; %add amount of particles
-                                    M_1.(X_n_nb).K(i_nb_size(1)+1) = K_local; %add value of number of colisions
-                                    M_1.(X_n_nb).P(i_nb_size(1)+1) = P_local; %add value of number of colisions
-                                end %end loc_nb > 0
-                            else %else snelehid is niet gevonden in de array
-                                %add if the array has no size
-                                i_nb_size = size(M_1.(X_n_nb).V'); %Look at size of the array
-                                M_1.(X_n_nb).V(i_nb_size(1)+1) = V_local_dist; %%add velocity
-                                M_1.(X_n_nb).N(i_nb_size(1)+1) = R_kans_nbots;  %add amount of particles
-                                M_1.(X_n_nb).K(i_nb_size(1)+1) = K_local;%add value of number of colisions
-                                M_1.(X_n_nb).P(i_nb_size(1)+1) = P_local;%add value of type of colisions
-                            end    %end if empty
-                        end  %Check if they disappear
-                        for all = 1:S_exp
-                            %%
-                            %
-                            % Colliding particles with a standing background
-                            %
-                            %--------------------------------------------------------------------------
-                            % Xbg_n_minb    %current position
-                            % X_n_b_st      % new location plasma
-                            % Xbg_n_b_st    % new location backgound
-                            %
-                            %write into single string and if X positions is 0 change to -0
-                            % some values are preset for improving
-                            % calucation speed
-                            value_X_n_b_st = round(x_new_bots_st(all)/X_delta+1); 
-                            if value_X_n_b_st == 0
-                                X_n_b_st = 'X_0';
-                            elseif value_X_n_b_st == 1
-                                X_n_b_st = 'X_1';
-                            elseif value_X_n_b_st == ((X_end-X_begin)/X_delta)-2;
-                                X_n_b_st = X_str_end2;
-                            elseif value_X_n_b_st == ((X_end-X_begin)/X_delta)-1;
-                                X_n_b_st = X_str_end1;
-                            elseif value_X_n_b_st > 0
-                                X_n_b_st = ['X_' myfastint2str(value_X_n_b_st)]; 
-                            else
-                                X_n_b_st = 'X_-0';
-                            end
-                            
-                            % some values are preset for improving
-                            % calucation speed
-                            value_X_nbg_b_st_a = round(x_newbg_bots_st(all)/X_delta+1); 
-                            if value_X_nbg_b_st_a == 0
-                                Xbg_n_b_st = 'X_0';
-                            elseif value_X_nbg_b_st_a == 1
-                                Xbg_n_b_st = 'X_1';
-                            elseif value_X_nbg_b_st_a == ((X_end-X_begin)/X_delta)-2;
-                                Xbg_n_b_st = X_str_end2;
-                            elseif value_X_nbg_b_st_a == ((X_end-X_begin)/X_delta)-1;
-                                Xbg_n_b_st = X_str_end1;
-                            elseif value_X_nbg_b_st_a > 0
-                                Xbg_n_b_st = ['X_' myfastint2str(value_X_nbg_b_st_a)];
-                            else
-                                Xbg_n_b_st = 'X_-0';
-                            end
-                            %de deeltjes die aankomen ( de voorwaarden,
-                            %deeltjes die een grotere X_ts hebben dan X_ts
-                            % deeltjes die starten vanaf X die kleiners is
-                            % dan X_TS
-                            % kan geen negatieeve snelheid hebben om te
-                            % tellen
-                            % meer dan 1 deeltjem gene hele kleine
-                            % fracties, scheelt rekentijd.
-                            
-                            if  X_TS < cosd(rad-Rad_delta)*x_new_bots_st(all) && X_TS >= cosd(rad-Rad_delta)*X && V_local_dist>-1  && R_kans_bots_st(all) > 1
-                                Ek_loc = round(V_local_dist/V_minimaal)+1;
-                                Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_bots_st(all); %aantal,tijd,type
-                            end
-                            %de deeltjes die verdwijnen
-                            if x_new_bots_st(all) >= (X_end-X_delta)  || x_new_bots_st(all) < 0 || R_kans_bots_st(all) < 1 || X_n_b_st(3)=='-'%Check if they disappear
-                                
-                            else
-                                %Reactions with Oxygen:
-                                %---------------------------
-                                %NOTE making of CuO
-                                %makeing of MO
-                                if V_local_dist > sqrt(E_O_low*2/m_p(1)) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
-                                    P_local_temp = 2 ;
-                                else
-                                    P_local_temp = P_local;
-                                end
-                                %NOTE making of TIO2 MO2
-                                if MO2 == 1
-                                    if V_local_dist > sqrt(E_O_low*2/m_p(3)) && V_local_dist < sqrt(E_O_high*2/m_p(3)) && P_local==2
-                                        P_local_temp = 3 ;
-                                    end
-                                end
-                                %---------------------------
-                                %Plocal 0 = M
-                                %Plocal 1 = O
-                                %P local 2 = MO
-                                %P local 3 = MO2
-                                %zoek of snelheid al bestaat voor het eventueel bijschijven
-                                i_b_v = (M_1.(X_n_b_st).V == V_min_st);
-                                i_b_k = (M_1.(X_n_b_st).K == (K_local+1));
-                                i_b_p = (M_1.(X_n_b_st).P == P_local_temp);
-                                if isempty(i_b_v) == 0 %snelehid is niet gevonden in de array
-                                    loc_b=find(i_b_v.*i_b_k.*i_b_p == 1); %vind de locatie waar k en v gelijk zijn
-                                    if loc_b > 0 %als er een lcoatie is
-                                        N_loc_b = M_1.(X_n_b_st).N(loc_b); %vooraf aantal aanwezige deeltjes bepalen op locatie
-                                        M_1.(X_n_b_st).N(loc_b) = N_loc_b+R_kans_bots_st(all); %deeltje bijschrijven op nieuwe locatatie voor niet bots
-                                    else
-                                        i_b_size = size(M_1.(X_n_b_st).V'); %kijken hoe groot de array is
-                                        M_1.(X_n_b_st).V(i_b_size(1)+1) = V_min_st; %nieuwe snelheid bijscrijven
-                                        M_1.(X_n_b_st).N(i_b_size(1)+1) = R_kans_bots_st(all); %nieuwe verdeling bijschrijven
-                                        M_1.(X_n_b_st).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
-                                        M_1.(X_n_b_st).P(i_b_size(1)+1) = P_local_temp; %type deeltje
-                                    end %end loc_b > 0
-                                else %geen bestaande plek om data erbij te voegen
-                                    %bijschrijven van de nieuwe data
-                                    i_b_size = size(M_1.(X_n_b_st).V'); %kijken hoe groot de array is
-                                    M_1.(X_n_b_st).V(i_b_size(1)+1) = V_min_st; %nieuwe snelheid bijscrijven
-                                    M_1.(X_n_b_st).N(i_b_size(1)+1) = R_kans_bots_st(all); %nieuwe verdeling bijschrijven
-                                    M_1.(X_n_b_st).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
-                                    M_1.(X_n_b_st).P(i_b_size(1)+1) = P_local_temp; %aantal geboste deeltjes
-                                end %end if empty
-                            end %bijschrijven bostingen
-                            % clear i_b_v i_b_size i_b_v i_b_k Vbg_new  i_b_p
-                            %for the background
-                            Xbg_n_minb_curr = ['X_' myfastint2str(round(x+all-1))]; %curret all
-                            if x+all-1 > (X_end/X_delta)
-                            else
-                                if x_newbg_bots_st(all) >= (X_end-X_delta) || x_newbg_bots_st(all) < 0 || Xbg_n_b_st(3)=='-' %Check if they disappear
-                                    Mbg.(Xbg_n_minb_curr).N(1) = Mbg.(Xbg_n_minb_curr).N(1)-R_kans_bots_st(all); %remove background particles
-                                else %if they move to a new space
-                                    %remove background particles
-                                    Mbg.(Xbg_n_b_st).N(2) = Mbg.(Xbg_n_b_st).N(2)+R_kans_bots_st(all);
-                                    %add particles
-                                    Mbg.(Xbg_n_minb_curr).N(1) = Mbg.(Xbg_n_minb_curr).N(1)-R_kans_bots_st(all);
-                                    %add new velocities
-                                    Vbg_new = (Mbg.(Xbg_n_b_st).V(2)*(Mbg.(Xbg_n_b_st).N(2)-R_kans_bots_st(all))+ R_kans_bots_st(all)*Vbg_min_st)/(Mbg.(Xbg_n_b_st).N(2));
-                                    if isnan(Vbg_new) == 1
-                                        Vbg_new = 0;
-                                    end
-                                    Mbg.(Xbg_n_b_st).V(2) = Vbg_new ;
-                                end %end vCheck if they disappear
-                            end %end if x+all-1 > (X_end-X_delta)
-                            %End of the part background
-                            %%
-                            %
-                            % Colliding particles with a moving background
-                            %
-                            %--------------------------------------------------------------------------
-                            % Xbg_n_minb    %huidige positie
-                            % X_n_b_mo      % nieuwe locatie van plasma deeltjes die gebotst zijn met stil staand plasma
-                            % Xbg_n_b_mo    % nieuwe locatie van background deeltjes die gebotst zijn met stil staand plasma
-                            %
-                            
-                            % Voor de plume
-                            % some values are preset for improving
-                            % calucation speed
-                            value_X_n_b_mo_a = round(x_new_bots_mo(all)/X_delta+1);
-                            if value_X_n_b_mo_a == 0
-                                X_n_b_mo = 'X_0';
-                            elseif value_X_n_b_mo_a == 1
-                                X_n_b_mo = 'X_1';
-                            elseif value_X_n_b_mo_a == ((X_end-X_begin)/X_delta)-2;
-                                X_n_b_mo = X_str_end2;
-                            elseif value_X_n_b_mo_a == ((X_end-X_begin)/X_delta)-1;
-                                X_n_b_mo = X_str_end1;
-                            elseif value_X_n_b_mo_a > 0
-                                X_n_b_mo = ['X_' myfastint2str(value_X_n_b_mo_a)];
-                            else
-                                X_n_b_mo = 'X_-0';
-                            end
-                            
-                            % some values are preset for improving
-                            % calucation speed
-                            value_X_nbg_b_mo_a = round(x_newbg_bots_mo(all)/X_delta+1);
-                            if value_X_nbg_b_mo_a == 0
-                                Xbg_n_b_mo = 'X_0';
-                            elseif value_X_nbg_b_mo_a == 1   
-                                Xbg_n_b_mo = 'X_1';
-                            elseif value_X_nbg_b_mo_a == ((X_end-X_begin)/X_delta)-2;
-                                Xbg_n_b_mo = X_str_end2;
-                            elseif value_X_nbg_b_mo_a == ((X_end-X_begin)/X_delta)-1;
-                                Xbg_n_b_mo = X_str_end1;
-                            elseif value_X_nbg_b_mo_a > 0
-                                Xbg_n_b_mo = ['X_' myfastint2str(value_X_nbg_b_mo_a)];
-                            else
-                                Xbg_n_b_mo = 'X_-0';
-                            end
-                                
-
-                            %de deeltjes die aankomen
-                            if X_TS < cosd(rad-Rad_delta)*x_new_bots_mo(all)  && X_TS >= cosd(rad-Rad_delta)*X   && R_kans_bots_mo(all) > 1  && V_local_dist>-1 %&& V_local_dist<8E4
-                                Ek_loc = round(V_local_dist/V_minimaal)+1;
-                                Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_bots_mo(all); %aantal,tijd,type
-                            end
-                            %de deetljes die verdwijnen
-                            if x_new_bots_mo(all) >= (X_end-X_delta) || x_new_bots_mo(all) == X_end || x_new_bots_mo(all) < 0 || R_kans_bots_mo(all) < 1 || X_n_b_mo(3)=='-'%Check if they disappear
-                            else
-                                %Reactions with Oxygen:
-                                %---------------------------
-                                %NOTE making of TIO
-                                if V_local_dist > sqrt(E_O_low*2/m_p(1)) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
-                                    P_local_temp = 2 ;
-                                else
-                                    P_local_temp = P_local;
-                                end
-                                %NOTE making of TIO2
-                                if MO2 == 1
-                                    if V_local_dist > sqrt(E_O_low*2/m_p(3)) && V_local_dist < sqrt(E_O_high*2/m_p(3)) && P_local==2
-                                        P_local_temp = 3 ;
-                                    end
-                                end
-                                %---------------------------
-                                %Plocal 0 = M
-                                %Plocal 1 = O
-                                %P local 2 = MO
-                                %P local 3 = MO2
-                                %same notes as above only in Dutch
-                                %zoek of snelheid al bestaat voor het eventueel bijschijven
-                                i_b_v = (M_1.(X_n_b_mo).V == V_min_mo);
-                                i_b_k = (M_1.(X_n_b_mo).K == (K_local+1));
-                                i_b_p = (M_1.(X_n_b_mo).P == P_local_temp);
-                                if isempty(i_b_v)==0 %snelehid is niet gevonden in de array
-                                    loc_b = find(i_b_v.*i_b_k.*i_b_p == 1); %vind de locatie waar k en v gelijk zijn
-                                    if loc_b > 0 %als er een lcoatie is
-                                        N_loc_b = M_1.(X_n_b_mo).N(loc_b); %vooraf aantal aanwezige deeltjes bepalen op locatie
-                                        M_1.(X_n_b_mo).N(loc_b) = N_loc_b+R_kans_bots_mo(all); %deeltje bijschrijven op nieuwe locatatie voor niet bots
-                                    else
-                                        i_b_size = size(M_1.(X_n_b_mo).V'); %kijken hoe groot de array is
-                                        M_1.(X_n_b_mo).V(i_b_size(1)+1) = V_min_mo; %nieuwe snelheid bijscrijven
-                                        M_1.(X_n_b_mo).N(i_b_size(1)+1) = R_kans_bots_mo(all); %nieuwe verdeling bijschrijven
-                                        M_1.(X_n_b_mo).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
-                                        M_1.(X_n_b_mo).P(i_b_size(1)+1) = P_local_temp; %type geboste deeltjes
-                                    end %end loc_b > 0
-                                else %geen bestaande plek om data erbij te voegen
-                                    %bijschrijven van de nieuwe data
-                                    i_b_size = size(M_1.(X_n_b_mo).V'); %kijken hoe groot de array is
-                                    M_1.(X_n_b_mo).V(i_b_size(1)+1) = V_min_mo; %nieuwe snelheid bijscrijven
-                                    M_1.(X_n_b_mo).N(i_b_size(1)+1) = R_kans_bots_mo(all); %nieuwe verdeling bijschrijven
-                                    M_1.(X_n_b_mo).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
-                                    M_1.(X_n_b_mo).P(i_b_size(1)+1) = P_local_temp; %type geboste deeltjes
-                                end %end if empty
-                            end %bijschrijven bostingen MO
-                            %background
-                            if x+all-1 > (X_end/X_delta)
-                            else
-                                if x_newbg_bots_mo(all) >= (X_end-X_delta) || x_newbg_bots_mo(all) < 0 || Xbg_n_b_mo(3)=='-' %als deeltjes buiten meetgebied komen
-                                    Mbg.(Xbg_n_minb_curr).N(2) = Mbg.(Xbg_n_minb_curr).N(2)-R_kans_bots_mo(all); %deeltjes utischrijven
-                                else %als deeltjes verplaatsen naar nieuwe ruimte
-                                    Mbg.(Xbg_n_b_mo).N(2) = Mbg.(Xbg_n_b_mo).N(2)+R_kans_bots_mo(all);   %bijschrijven achtergrond deeltjes in nieuw vakje vanuit bewegen
-                                    Mbg.(Xbg_n_minb_curr).N(2) = Mbg.(Xbg_n_minb_curr).N(2)-R_kans_bots_mo(all); %weghalen deeltjes in huidig vakje
-                                    %bijschrijven snelheden
-                                    Vbg_new = (Mbg.(Xbg_n_b_mo).V(2)*(Mbg.(Xbg_n_b_mo).N(2)-R_kans_bots_mo(all))+ R_kans_bots_mo(all)*Vbg_min_mo(all))/(Mbg.(Xbg_n_b_mo).N(2));
-                                    if isnan(Vbg_new)==1 || Vbg_new == Inf
-                                        Vbg_new=0;
-                                    end
-                                    if Vbg_new > X_end/T_delta
-                                        Vbg_new = 600000;
-                                    end
-                                    Mbg.(Xbg_n_b_mo).V(2) = Vbg_new ;
-                                end %end van background als deeltjes uit gebied vliegen
-                            end %x+all-1 > (X_end/X_delta)
-                            
-                        end %end all S_exp
-                        
-                        
-                        % Remove entries smaller then 1
-                        if x+all-1 > (X_end/X_delta)
-                        else
-                            if Mbg.(Xbg_n_minb_curr).N(1) < 1
-                                Mbg.(Xbg_n_minb_curr).N(1) = 0;
-                            end
-                            if Mbg.(Xbg_n_minb_curr).N(2)< 1
-                                Mbg.(Xbg_n_minb_curr).N(2) = 0;
-                                Mbg.(Xbg_n_minb_curr).V(2) = 0;
-                            end
-                            if x_newbg_bots_mo(all) >= (X_end-X_delta) || x_newbg_bots_mo(all) < 0 || Xbg_n_b_mo(3)=='-'
-                            else
-                                if Mbg.(Xbg_n_b_mo).N(2) < 1
-                                    Mbg.(Xbg_n_b_mo).N(2) = 0;
-                                    Mbg.(Xbg_n_b_mo).V(2) = 0;
-                                end
-                            end
-                        end %x+all-1 > (X_end/X_delta)
-                        %  vv;
+%                         %% check moment
+%                         % %--------------------------------------------------------------------------
+%                         
+%                         %% Writing particles into struture M_1 en Mbg
+%                         %
+%                         % Non coliding particles
+%                         %
+%                         %--------------------------------------------------------------------------
+%                         %de deeltjes die aankomen
+%                         if X_TS < cosd(rad-Rad_delta)*x_new_nbots  && X_TS >= cosd(rad-Rad_delta)*X  && R_kans_nbots > 1 && V_local_dist>-1 %&& V_local_dist<8E4
+%                             Ek_loc = round(V_local_dist/V_minimaal)+1;
+%                             Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_nbots; %aantal,tijd,type
+%                         end
+%                         %de deeltjes die verdwijnen
+%                         if x_new_nbots >= (X_end-X_delta) || x_new_nbots < 0 || R_kans_nbots < 1 %Check if they disappear
+%                             
+%                         else %if they dont disappear
+%                             %Search if the velocity and number of colisions is already
+%                             %in the structure
+%                             
+%                             i_nb_v = (M_1.(X_n_nb).V == V_local_dist);
+%                             i_nb_k = (M_1.(X_n_nb).K == K_local);
+%                             i_nb_p = (M_1.(X_n_nb).P == P_local);
+%                             if isempty(i_nb_v)==0 %snelehid is niet gevonden in de array
+%                                 loc_nb = find(i_nb_v.*i_nb_k.*i_nb_p == 1) ;%if verlocity and K collisions are equal
+%                                 if loc_nb > 0 %if there is a location
+%                                     N_loc_nb = M_1.(X_n_nb).N(loc_nb); %Amount of particles on the new location
+%                                     M_1.(X_n_nb).N(loc_nb) = N_loc_nb+R_kans_nbots; %Add particles to the location
+%                                 else %If there is no existing data make a new entry
+%                                     %adding the data
+%                                     i_nb_size = size(M_1.(X_n_nb).V'); %Look at size of the array
+%                                     M_1.(X_n_nb).V(i_nb_size(1)+1) = V_local_dist; %add velocity
+%                                     M_1.(X_n_nb).N(i_nb_size(1)+1) = R_kans_nbots; %add amount of particles
+%                                     M_1.(X_n_nb).K(i_nb_size(1)+1) = K_local; %add value of number of colisions
+%                                     M_1.(X_n_nb).P(i_nb_size(1)+1) = P_local; %add value of number of colisions
+%                                 end %end loc_nb > 0
+%                             else %else snelehid is niet gevonden in de array
+%                                 %add if the array has no size
+%                                 i_nb_size = size(M_1.(X_n_nb).V'); %Look at size of the array
+%                                 M_1.(X_n_nb).V(i_nb_size(1)+1) = V_local_dist; %%add velocity
+%                                 M_1.(X_n_nb).N(i_nb_size(1)+1) = R_kans_nbots;  %add amount of particles
+%                                 M_1.(X_n_nb).K(i_nb_size(1)+1) = K_local;%add value of number of colisions
+%                                 M_1.(X_n_nb).P(i_nb_size(1)+1) = P_local;%add value of type of colisions
+%                             end    %end if empty
+%                         end  %Check if they disappear
+%                         for all = 1:S_exp
+%                             %%
+%                             %
+%                             % Colliding particles with a standing background
+%                             %
+%                             %--------------------------------------------------------------------------
+%                             % Xbg_n_minb    %current position
+%                             % X_n_b_st      % new location plasma
+%                             % Xbg_n_b_st    % new location backgound
+%                             %
+%                             %write into single string and if X positions is 0 change to -0
+%                             % some values are preset for improving
+%                             % calucation speed
+%                             value_X_n_b_st = round(x_new_bots_st(all)/X_delta+1); 
+%                             if value_X_n_b_st == 0
+%                                 X_n_b_st = 'X_0';
+%                             elseif value_X_n_b_st == 1
+%                                 X_n_b_st = 'X_1';
+%                             elseif value_X_n_b_st == ((X_end-X_begin)/X_delta)-2;
+%                                 X_n_b_st = X_str_end2;
+%                             elseif value_X_n_b_st == ((X_end-X_begin)/X_delta)-1;
+%                                 X_n_b_st = X_str_end1;
+%                             elseif value_X_n_b_st > 0
+%                                 X_n_b_st = ['X_' myfastint2str(value_X_n_b_st)]; 
+%                             else
+%                                 X_n_b_st = 'X_-0';
+%                             end
+%                             
+%                             % some values are preset for improving
+%                             % calucation speed
+%                             value_X_nbg_b_st_a = round(x_newbg_bots_st(all)/X_delta+1); 
+%                             if value_X_nbg_b_st_a == 0
+%                                 Xbg_n_b_st = 'X_0';
+%                             elseif value_X_nbg_b_st_a == 1
+%                                 Xbg_n_b_st = 'X_1';
+%                             elseif value_X_nbg_b_st_a == ((X_end-X_begin)/X_delta)-2;
+%                                 Xbg_n_b_st = X_str_end2;
+%                             elseif value_X_nbg_b_st_a == ((X_end-X_begin)/X_delta)-1;
+%                                 Xbg_n_b_st = X_str_end1;
+%                             elseif value_X_nbg_b_st_a > 0
+%                                 Xbg_n_b_st = ['X_' myfastint2str(value_X_nbg_b_st_a)];
+%                             else
+%                                 Xbg_n_b_st = 'X_-0';
+%                             end
+%                             %de deeltjes die aankomen ( de voorwaarden,
+%                             %deeltjes die een grotere X_ts hebben dan X_ts
+%                             % deeltjes die starten vanaf X die kleiners is
+%                             % dan X_TS
+%                             % kan geen negatieeve snelheid hebben om te
+%                             % tellen
+%                             % meer dan 1 deeltjem gene hele kleine
+%                             % fracties, scheelt rekentijd.
+%                             
+%                             if  X_TS < cosd(rad-Rad_delta)*x_new_bots_st(all) && X_TS >= cosd(rad-Rad_delta)*X && V_local_dist>-1  && R_kans_bots_st(all) > 1
+%                                 Ek_loc = round(V_local_dist/V_minimaal)+1;
+%                                 Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_bots_st(all); %aantal,tijd,type
+%                             end
+%                             %de deeltjes die verdwijnen
+%                             if x_new_bots_st(all) >= (X_end-X_delta)  || x_new_bots_st(all) < 0 || R_kans_bots_st(all) < 1 || X_n_b_st(3)=='-'%Check if they disappear
+%                                 
+%                             else
+%                                 %Reactions with Oxygen:
+%                                 %---------------------------
+%                                 %NOTE making of CuO
+%                                 %makeing of MO
+%                                 if V_local_dist > sqrt(E_O_low*2/m_p(1)) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
+%                                     P_local_temp = 2 ;
+%                                 else
+%                                     P_local_temp = P_local;
+%                                 end
+%                                 %NOTE making of TIO2 MO2
+%                                 if MO2 == 1
+%                                     if V_local_dist > sqrt(E_O_low*2/m_p(3)) && V_local_dist < sqrt(E_O_high*2/m_p(3)) && P_local==2
+%                                         P_local_temp = 3 ;
+%                                     end
+%                                 end
+%                                 %---------------------------
+%                                 %Plocal 0 = M
+%                                 %Plocal 1 = O
+%                                 %P local 2 = MO
+%                                 %P local 3 = MO2
+%                                 %zoek of snelheid al bestaat voor het eventueel bijschijven
+%                                 i_b_v = (M_1.(X_n_b_st).V == V_min_st);
+%                                 i_b_k = (M_1.(X_n_b_st).K == (K_local+1));
+%                                 i_b_p = (M_1.(X_n_b_st).P == P_local_temp);
+%                                 if isempty(i_b_v) == 0 %snelehid is niet gevonden in de array
+%                                     loc_b=find(i_b_v.*i_b_k.*i_b_p == 1); %vind de locatie waar k en v gelijk zijn
+%                                     if loc_b > 0 %als er een lcoatie is
+%                                         N_loc_b = M_1.(X_n_b_st).N(loc_b); %vooraf aantal aanwezige deeltjes bepalen op locatie
+%                                         M_1.(X_n_b_st).N(loc_b) = N_loc_b+R_kans_bots_st(all); %deeltje bijschrijven op nieuwe locatatie voor niet bots
+%                                     else
+%                                         i_b_size = size(M_1.(X_n_b_st).V'); %kijken hoe groot de array is
+%                                         M_1.(X_n_b_st).V(i_b_size(1)+1) = V_min_st; %nieuwe snelheid bijscrijven
+%                                         M_1.(X_n_b_st).N(i_b_size(1)+1) = R_kans_bots_st(all); %nieuwe verdeling bijschrijven
+%                                         M_1.(X_n_b_st).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
+%                                         M_1.(X_n_b_st).P(i_b_size(1)+1) = P_local_temp; %type deeltje
+%                                     end %end loc_b > 0
+%                                 else %geen bestaande plek om data erbij te voegen
+%                                     %bijschrijven van de nieuwe data
+%                                     i_b_size = size(M_1.(X_n_b_st).V'); %kijken hoe groot de array is
+%                                     M_1.(X_n_b_st).V(i_b_size(1)+1) = V_min_st; %nieuwe snelheid bijscrijven
+%                                     M_1.(X_n_b_st).N(i_b_size(1)+1) = R_kans_bots_st(all); %nieuwe verdeling bijschrijven
+%                                     M_1.(X_n_b_st).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
+%                                     M_1.(X_n_b_st).P(i_b_size(1)+1) = P_local_temp; %aantal geboste deeltjes
+%                                 end %end if empty
+%                             end %bijschrijven bostingen
+%                             % clear i_b_v i_b_size i_b_v i_b_k Vbg_new  i_b_p
+%                             %for the background
+%                             Xbg_n_minb_curr = ['X_' myfastint2str(round(x+all-1))]; %curret all
+%                             if x+all-1 > (X_end/X_delta)
+%                             else
+%                                 if x_newbg_bots_st(all) >= (X_end-X_delta) || x_newbg_bots_st(all) < 0 || Xbg_n_b_st(3)=='-' %Check if they disappear
+%                                     Mbg.(Xbg_n_minb_curr).N(1) = Mbg.(Xbg_n_minb_curr).N(1)-R_kans_bots_st(all); %remove background particles
+%                                 else %if they move to a new space
+%                                     %remove background particles
+%                                     Mbg.(Xbg_n_b_st).N(2) = Mbg.(Xbg_n_b_st).N(2)+R_kans_bots_st(all);
+%                                     %add particles
+%                                     Mbg.(Xbg_n_minb_curr).N(1) = Mbg.(Xbg_n_minb_curr).N(1)-R_kans_bots_st(all);
+%                                     %add new velocities
+%                                     Vbg_new = (Mbg.(Xbg_n_b_st).V(2)*(Mbg.(Xbg_n_b_st).N(2)-R_kans_bots_st(all))+ R_kans_bots_st(all)*Vbg_min_st)/(Mbg.(Xbg_n_b_st).N(2));
+%                                     if isnan(Vbg_new) == 1
+%                                         Vbg_new = 0;
+%                                     end
+%                                     Mbg.(Xbg_n_b_st).V(2) = Vbg_new ;
+%                                 end %end vCheck if they disappear
+%                             end %end if x+all-1 > (X_end-X_delta)
+%                             %End of the part background
+%                             %%
+%                             %
+%                             % Colliding particles with a moving background
+%                             %
+%                             %--------------------------------------------------------------------------
+%                             % Xbg_n_minb    %huidige positie
+%                             % X_n_b_mo      % nieuwe locatie van plasma deeltjes die gebotst zijn met stil staand plasma
+%                             % Xbg_n_b_mo    % nieuwe locatie van background deeltjes die gebotst zijn met stil staand plasma
+%                             %
+%                             
+%                             % Voor de plume
+%                             % some values are preset for improving
+%                             % calucation speed
+%                             value_X_n_b_mo_a = round(x_new_bots_mo(all)/X_delta+1);
+%                             if value_X_n_b_mo_a == 0
+%                                 X_n_b_mo = 'X_0';
+%                             elseif value_X_n_b_mo_a == 1
+%                                 X_n_b_mo = 'X_1';
+%                             elseif value_X_n_b_mo_a == ((X_end-X_begin)/X_delta)-2;
+%                                 X_n_b_mo = X_str_end2;
+%                             elseif value_X_n_b_mo_a == ((X_end-X_begin)/X_delta)-1;
+%                                 X_n_b_mo = X_str_end1;
+%                             elseif value_X_n_b_mo_a > 0
+%                                 X_n_b_mo = ['X_' myfastint2str(value_X_n_b_mo_a)];
+%                             else
+%                                 X_n_b_mo = 'X_-0';
+%                             end
+%                             
+%                             % some values are preset for improving
+%                             % calucation speed
+%                             value_X_nbg_b_mo_a = round(x_newbg_bots_mo(all)/X_delta+1);
+%                             if value_X_nbg_b_mo_a == 0
+%                                 Xbg_n_b_mo = 'X_0';
+%                             elseif value_X_nbg_b_mo_a == 1   
+%                                 Xbg_n_b_mo = 'X_1';
+%                             elseif value_X_nbg_b_mo_a == ((X_end-X_begin)/X_delta)-2;
+%                                 Xbg_n_b_mo = X_str_end2;
+%                             elseif value_X_nbg_b_mo_a == ((X_end-X_begin)/X_delta)-1;
+%                                 Xbg_n_b_mo = X_str_end1;
+%                             elseif value_X_nbg_b_mo_a > 0
+%                                 Xbg_n_b_mo = ['X_' myfastint2str(value_X_nbg_b_mo_a)];
+%                             else
+%                                 Xbg_n_b_mo = 'X_-0';
+%                             end
+%                                 
+% 
+%                             %de deeltjes die aankomen
+%                             if X_TS < cosd(rad-Rad_delta)*x_new_bots_mo(all)  && X_TS >= cosd(rad-Rad_delta)*X   && R_kans_bots_mo(all) > 1  && V_local_dist>-1 %&& V_local_dist<8E4
+%                                 Ek_loc = round(V_local_dist/V_minimaal)+1;
+%                                 Ek_arr_N(Ek_loc,P_local+1) = Ek_arr_N(Ek_loc,P_local+1)+R_kans_bots_mo(all); %aantal,tijd,type
+%                             end
+%                             %de deetljes die verdwijnen
+%                             if x_new_bots_mo(all) >= (X_end-X_delta) || x_new_bots_mo(all) == X_end || x_new_bots_mo(all) < 0 || R_kans_bots_mo(all) < 1 || X_n_b_mo(3)=='-'%Check if they disappear
+%                             else
+%                                 %Reactions with Oxygen:
+%                                 %---------------------------
+%                                 %NOTE making of TIO
+%                                 if V_local_dist > sqrt(E_O_low*2/m_p(1)) && V_local_dist < sqrt(E_O_high*2/m_p(1)) && P_local==0
+%                                     P_local_temp = 2 ;
+%                                 else
+%                                     P_local_temp = P_local;
+%                                 end
+%                                 %NOTE making of TIO2
+%                                 if MO2 == 1
+%                                     if V_local_dist > sqrt(E_O_low*2/m_p(3)) && V_local_dist < sqrt(E_O_high*2/m_p(3)) && P_local==2
+%                                         P_local_temp = 3 ;
+%                                     end
+%                                 end
+%                                 %---------------------------
+%                                 %Plocal 0 = M
+%                                 %Plocal 1 = O
+%                                 %P local 2 = MO
+%                                 %P local 3 = MO2
+%                                 %same notes as above only in Dutch
+%                                 %zoek of snelheid al bestaat voor het eventueel bijschijven
+%                                 i_b_v = (M_1.(X_n_b_mo).V == V_min_mo);
+%                                 i_b_k = (M_1.(X_n_b_mo).K == (K_local+1));
+%                                 i_b_p = (M_1.(X_n_b_mo).P == P_local_temp);
+%                                 if isempty(i_b_v)==0 %snelehid is niet gevonden in de array
+%                                     loc_b = find(i_b_v.*i_b_k.*i_b_p == 1); %vind de locatie waar k en v gelijk zijn
+%                                     if loc_b > 0 %als er een lcoatie is
+%                                         N_loc_b = M_1.(X_n_b_mo).N(loc_b); %vooraf aantal aanwezige deeltjes bepalen op locatie
+%                                         M_1.(X_n_b_mo).N(loc_b) = N_loc_b+R_kans_bots_mo(all); %deeltje bijschrijven op nieuwe locatatie voor niet bots
+%                                     else
+%                                         i_b_size = size(M_1.(X_n_b_mo).V'); %kijken hoe groot de array is
+%                                         M_1.(X_n_b_mo).V(i_b_size(1)+1) = V_min_mo; %nieuwe snelheid bijscrijven
+%                                         M_1.(X_n_b_mo).N(i_b_size(1)+1) = R_kans_bots_mo(all); %nieuwe verdeling bijschrijven
+%                                         M_1.(X_n_b_mo).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
+%                                         M_1.(X_n_b_mo).P(i_b_size(1)+1) = P_local_temp; %type geboste deeltjes
+%                                     end %end loc_b > 0
+%                                 else %geen bestaande plek om data erbij te voegen
+%                                     %bijschrijven van de nieuwe data
+%                                     i_b_size = size(M_1.(X_n_b_mo).V'); %kijken hoe groot de array is
+%                                     M_1.(X_n_b_mo).V(i_b_size(1)+1) = V_min_mo; %nieuwe snelheid bijscrijven
+%                                     M_1.(X_n_b_mo).N(i_b_size(1)+1) = R_kans_bots_mo(all); %nieuwe verdeling bijschrijven
+%                                     M_1.(X_n_b_mo).K(i_b_size(1)+1) = K_local+1; %aantal geboste deeltjes
+%                                     M_1.(X_n_b_mo).P(i_b_size(1)+1) = P_local_temp; %type geboste deeltjes
+%                                 end %end if empty
+%                             end %bijschrijven bostingen MO
+%                             %background
+%                             if x+all-1 > (X_end/X_delta)
+%                             else
+%                                 if x_newbg_bots_mo(all) >= (X_end-X_delta) || x_newbg_bots_mo(all) < 0 || Xbg_n_b_mo(3)=='-' %als deeltjes buiten meetgebied komen
+%                                     Mbg.(Xbg_n_minb_curr).N(2) = Mbg.(Xbg_n_minb_curr).N(2)-R_kans_bots_mo(all); %deeltjes utischrijven
+%                                 else %als deeltjes verplaatsen naar nieuwe ruimte
+%                                     Mbg.(Xbg_n_b_mo).N(2) = Mbg.(Xbg_n_b_mo).N(2)+R_kans_bots_mo(all);   %bijschrijven achtergrond deeltjes in nieuw vakje vanuit bewegen
+%                                     Mbg.(Xbg_n_minb_curr).N(2) = Mbg.(Xbg_n_minb_curr).N(2)-R_kans_bots_mo(all); %weghalen deeltjes in huidig vakje
+%                                     %bijschrijven snelheden
+%                                     Vbg_new = (Mbg.(Xbg_n_b_mo).V(2)*(Mbg.(Xbg_n_b_mo).N(2)-R_kans_bots_mo(all))+ R_kans_bots_mo(all)*Vbg_min_mo(all))/(Mbg.(Xbg_n_b_mo).N(2));
+%                                     if isnan(Vbg_new)==1 || Vbg_new == Inf
+%                                         Vbg_new=0;
+%                                     end
+%                                     if Vbg_new > X_end/T_delta
+%                                         Vbg_new = 600000;
+%                                     end
+%                                     Mbg.(Xbg_n_b_mo).V(2) = Vbg_new ;
+%                                 end %end van background als deeltjes uit gebied vliegen
+%                             end %x+all-1 > (X_end/X_delta)
+%                             
+%                         end %end all S_exp
+%                         
+%                         
+%                         % Remove entries smaller then 1
+%                         if x+all-1 > (X_end/X_delta)
+%                         else
+%                             if Mbg.(Xbg_n_minb_curr).N(1) < 1
+%                                 Mbg.(Xbg_n_minb_curr).N(1) = 0;
+%                             end
+%                             if Mbg.(Xbg_n_minb_curr).N(2)< 1
+%                                 Mbg.(Xbg_n_minb_curr).N(2) = 0;
+%                                 Mbg.(Xbg_n_minb_curr).V(2) = 0;
+%                             end
+%                             if x_newbg_bots_mo(all) >= (X_end-X_delta) || x_newbg_bots_mo(all) < 0 || Xbg_n_b_mo(3)=='-'
+%                             else
+%                                 if Mbg.(Xbg_n_b_mo).N(2) < 1
+%                                     Mbg.(Xbg_n_b_mo).N(2) = 0;
+%                                     Mbg.(Xbg_n_b_mo).V(2) = 0;
+%                                 end
+%                             end
+%                         end %x+all-1 > (X_end/X_delta)
+%                         %  vv;
                     end %end of als V==0 %is Nan
-                    %% check moment
-                    %--------------------------------------------------------------------------
-                    
+%                     %% check moment
+%                     %--------------------------------------------------------------------------
+%                     
                 end %end of vv
-                
-                % Move the remaining background particles
-                Sbg_nb = Mbg.(Xbg_n_minb).V(2)*T_delta;
-                x_newbg_nbots = round(Sbg_nb/X_delta)*X_delta+X;
-                if x_newbg_nbots > 0
-                    Xbg_n_nb = ['X_' myfastint2str(round(x_newbg_nbots/X_delta+1))];
-                else
-                    Xbg_n_nb = ['X_' num2str(round(x_newbg_nbots/X_delta+1))];
-                end
-                if x_newbg_nbots >= (X_end-X_delta) || x_newbg_nbots == X_end || x_newbg_nbots < 0  || Xbg_n_nb(3)=='-' %check if they disappear
-                    Mbg.(Xbg_n_minb).N(2) = 0;
-                else %is they move to a new space
-                    %calculate new velocity
-                    Vbg_new = (Mbg.(Xbg_n_nb).N(2)*Mbg.(Xbg_n_nb).V(2) + Mbg.(Xbg_n_minb).V(2) * Mbg.(Xbg_n_minb).N(2))/(Mbg.(Xbg_n_minb).N(2)+Mbg.(Xbg_n_nb).N(2));
-                    if isnan(Vbg_new) == 1
-                        Vbg_new = 0;
-                    end
-                    Mbg.(Xbg_n_nb).V(2) = Vbg_new ;
-                    Mbg.(Xbg_n_nb).N(2) = Mbg.(Xbg_n_nb).N(2)+Mbg.(Xbg_n_minb).N(2);   %add particles
-                    Mbg.(Xbg_n_minb).N(2) = 0; %remove particles
-                end
+%                 
+%                 % Move the remaining background particles
+%                 Sbg_nb = Mbg.(Xbg_n_minb).V(2)*T_delta;
+%                 x_newbg_nbots = round(Sbg_nb/X_delta)*X_delta+X;
+%                 if x_newbg_nbots > 0
+%                     Xbg_n_nb = ['X_' myfastint2str(round(x_newbg_nbots/X_delta+1))];
+%                 else
+%                     Xbg_n_nb = ['X_' num2str(round(x_newbg_nbots/X_delta+1))];
+%                 end
+%                 if x_newbg_nbots >= (X_end-X_delta) || x_newbg_nbots == X_end || x_newbg_nbots < 0  || Xbg_n_nb(3)=='-' %check if they disappear
+%                     Mbg.(Xbg_n_minb).N(2) = 0;
+%                 else %is they move to a new space
+%                     %calculate new velocity
+%                     Vbg_new = (Mbg.(Xbg_n_nb).N(2)*Mbg.(Xbg_n_nb).V(2) + Mbg.(Xbg_n_minb).V(2) * Mbg.(Xbg_n_minb).N(2))/(Mbg.(Xbg_n_minb).N(2)+Mbg.(Xbg_n_nb).N(2));
+%                     if isnan(Vbg_new) == 1
+%                         Vbg_new = 0;
+%                     end
+%                     Mbg.(Xbg_n_nb).V(2) = Vbg_new ;
+%                     Mbg.(Xbg_n_nb).N(2) = Mbg.(Xbg_n_nb).N(2)+Mbg.(Xbg_n_minb).N(2);   %add particles
+%                     Mbg.(Xbg_n_minb).N(2) = 0; %remove particles
+%                 end
             end %end of fieldnames is small
         end %end of xx
-        %% check moment
+%         %% check moment
         
         %
         %% Get data from structure to arrays
