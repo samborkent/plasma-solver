@@ -278,7 +278,7 @@ energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 % energyBinding = energyFormation;    % Binding energy crystal [J]
 
 % Dimensional axis
-angle   = angleMin  : angleDelta    : angleMax - angleDelta;   % Angular axis
+angle   = angleMin  : angleDelta    : angleMax;   % Angular axis
 time    = timeMin   : timeDelta     : timeMax - timeDelta;     % Temporal axis
 radius  = radiusMin : radiusDelta   : radiusMax;               % Radial axis
 velo    = veloMin   : veloDelta     : veloMax - veloDelta;     % Velocity array
@@ -359,6 +359,11 @@ bgMatrix = zeros(nVelo, nFieldsVelo, nRadius - 1);
 
 binVolume = zeros(1, nRadius - 1);
 
+[xPos, yPos] = pol2cart(angle, radius);
+[XPos, YPos] = meshgrid(xPos, yPos);
+
+nPlasma3D = zeros(nAngle, nRadius);
+
 %% Calculations
 for iAngle = 1 : 1 % nAngle
     %% Main program per angle
@@ -404,7 +409,7 @@ for iAngle = 1 : 1 % nAngle
             nParticleVeloInit(:, species);
     end
     
-    for iTime = 1 : nTime
+    for iTime = 1 : 50 % nTime
         %% Main program per timestep
         
         for iRadius = 1 : (nRadius - 1)
@@ -424,11 +429,15 @@ for iAngle = 1 : 1 % nAngle
                 
                 % Limit number of traveled radial bins to the number of
                 %   radial bins between current bin and last bin
-                if nRadiusBinTraveled(iVelo) > (nRadius - iRadius)
-                    nRadiusVelo = nRadius - iRadius;
+                if nRadiusBinTraveled(iVelo) >= (nRadius - iRadius)
+                    nRadiusVelo = nRadius - iRadius - 1;
                 else
                     nRadiusVelo = nRadiusBinTraveled(iVelo);
                 end
+                
+%                 if nRadiusVelo == 0
+%                     continue
+%                 end
                 
                 % Loop through species in plasma
                 for species = 1 : nAtomUCNumel
@@ -436,102 +445,110 @@ for iAngle = 1 : 1 % nAngle
                     
                     % Number of plasma particles
                     nPlasma = plasmaMatrix(iVelo, Field.nParticles, ...
-                        iRadius, species);
-                    
-                    % Background density
-                    plasmaDensityBin = nPlasma / binVolume(iRadius);
-                    
-                    % Only calculate probability for collision with
-                    %   background particles that move slower than plume
-                    %   particles
-                    % Loop from lowest to highest as slow particles collide
-                    %   first
-                    for jVelo = 1 : iVelo - 1
-                        
-                        % Number of background particles
-                        nBG = bgMatrix(jVelo, Field.nParticles, iRadius);
-                        
-                        % If there is a difference between plasma and
-                        %   background particle velocities
-                        if jVelo > 0                           
-                            % Background density
-                            bgDensityBin = nBG / binVolume(iRadius);
+                                              iRadius, species);
 
-                            % Volume element 'covered' by plasma particle
-                            % in time step
-                            volumeDelta = (iVelo - jVelo) * timeDelta ...
-                                            * Sigma_Bg(species);
+                    plasmaMatrix(iVelo, Field.nParticles, ...
+                        iRadius, species) = 0;
 
-                            % Equation 9
-                            bgColProb = volumeDelta * bgDensityBin;
-
-                            % If there are more than one particles in the
-                            %   covered volume element, the collision
-                            % probability is 1
-                            if bgColProb > 1
-                                bgColProb = 1;
-                            end
-                        else
-                            bgColProb = 0;
-                        end
-                        
-                        % If there is a chance to collide
-                        if bgColProb > 0
-                            % Number of collided plasma particles
-                            nColPlasma = bgColProb * nPlasma;
-                            
-                            % If the number of collided particles if
-                            %   greater than the minimum amount of 
-                            %   particles per bin
-                            if nColPlasma > nParticleMin
-                                % Set number or particles in current bin to
-                                %   the number of non-collided particles
-                                plasmaMatrix( ...
-                                iVelo, Field.nParticles, iRadius, species ...
-                                   ) = nPlasma - nColPlasma;
-                                                           
-                                bgMatrix(jVelo, Field.nParticles, iRadius) ...
-                                    = nBG - nColPlasma;
-
-                                % Calculate new velocities
-                                % Equation 6
-                                newVelo = velo(iVelo) * (massArray(species) - massBG) ...
-                                            / (massArray(species) + massBG);
-                                % Equation 7
-                                newVeloBG = 2 * massArray(species) * velo(iVelo) ...
-                                            / (massArray(species) + massBG);
-                                
-                                % Corresponding indices
-                                iNewVelo    = iVelo + round(newVelo / veloDelta);
-                                jNewVeloBG  = jVelo + round(newVeloBG / veloDelta);
-                                
-                                if iNewVelo > nVelo
-                                    iNewVelo = nVelo;
-                                end
-                                
-                                if jNewVeloBG > nVelo
-                                    jNewVeloBG = nVelo;
-                                end
-                                
-                                % Add collided particles to new velocity
-                                %   bin after collision
-                                plasmaMatrix( iNewVelo, Field.nParticles, iRadius, species ) ...
-                                    = plasmaMatrix( ...
-                                iNewVelo, Field.nParticles, iRadius, species ) ...
-                                    + nColPlasma;
-                               
-                                bgMatrix( jNewVeloBG, Field.nParticles, iRadius) ...
-                                    = bgMatrix( jNewVeloBG, Field.nParticles, iRadius) ...
-                                    + nColPlasma;
-                            end
-                        end
-                       
-%                             colProbBG = ...
-%                                 (bgMatrix(jVelo, Field.nParticles, iRadius) ...
-%                                 / binVolume(iRadius)) / (sum(bgMatrix(:, ...
-%                                 Field.nParticles, iRadius)) / binVolume(iRadius) ) ...
-%                                 * iVelo * timeDelta;
-                    end
+                    plasmaMatrix(iVelo, Field.nParticles, ...
+                        iRadius + nRadiusVelo, species) ...
+                        = plasmaMatrix(iVelo, Field.nParticles, ...
+                        iRadius + nRadiusVelo, species) + nPlasma;
+                   
+%                     % Background density
+%                     plasmaDensityBin = nPlasma / binVolume(iRadius);
+%                     
+%                     % Only calculate probability for collision with
+%                     %   background particles that move slower than plume
+%                     %   particles
+%                     % Loop from lowest to highest as slow particles collide
+%                     %   first
+%                     for jVelo = 1 : iVelo - 1
+%                         
+%                         % Number of background particles
+%                         nBG = bgMatrix(jVelo, Field.nParticles, iRadius);
+%                         
+%                         % If there is a difference between plasma and
+%                         %   background particle velocities
+%                         if jVelo > 0                           
+%                             % Background density
+%                             bgDensityBin = nBG / binVolume(iRadius);
+% 
+%                             % Volume element 'covered' by plasma particle
+%                             % in time step
+%                             volumeDelta = (iVelo - jVelo) * timeDelta ...
+%                                             * Sigma_Bg(species);
+% 
+%                             % Equation 9
+%                             bgColProb = volumeDelta * bgDensityBin;
+% 
+%                             % If there are more than one particles in the
+%                             %   covered volume element, the collision
+%                             % probability is 1
+%                             if bgColProb > 1
+%                                 bgColProb = 1;
+%                             end
+%                         else
+%                             bgColProb = 0;
+%                         end
+%                         
+%                         % If there is a chance to collide
+%                         if bgColProb > 0
+%                             % Number of collided plasma particles
+%                             nColPlasma = bgColProb * nPlasma;
+%                             
+%                             % If the number of collided particles if
+%                             %   greater than the minimum amount of 
+%                             %   particles per bin
+%                             if nColPlasma > nParticleMin
+%                                 % Set number or particles in current bin to
+%                                 %   the number of non-collided particles
+%                                 plasmaMatrix( ...
+%                                 iVelo, Field.nParticles, iRadius, species ...
+%                                    ) = nPlasma - nColPlasma;
+%                                                            
+%                                 bgMatrix(jVelo, Field.nParticles, iRadius) ...
+%                                     = nBG - nColPlasma;
+% 
+%                                 % Calculate new velocities
+%                                 % Equation 6
+%                                 newVelo = velo(iVelo) * (massArray(species) - massBG) ...
+%                                             / (massArray(species) + massBG);
+%                                 % Equation 7
+%                                 newVeloBG = 2 * massArray(species) * velo(iVelo) ...
+%                                             / (massArray(species) + massBG);
+%                                 
+%                                 % Corresponding indices
+%                                 iNewVelo    = iVelo + round(newVelo / veloDelta);
+%                                 jNewVeloBG  = jVelo + round(newVeloBG / veloDelta);
+%                                 
+%                                 if iNewVelo > nVelo
+%                                     iNewVelo = nVelo;
+%                                 end
+%                                 
+%                                 if jNewVeloBG > nVelo
+%                                     jNewVeloBG = nVelo;
+%                                 end
+%                                 
+%                                 % Add collided particles to new velocity
+%                                 %   bin after collision
+%                                 plasmaMatrix( iNewVelo, Field.nParticles, iRadius, species ) ...
+%                                     = plasmaMatrix( ...
+%                                 iNewVelo, Field.nParticles, iRadius, species ) ...
+%                                     + nColPlasma;
+%                                
+%                                 bgMatrix( jNewVeloBG, Field.nParticles, iRadius) ...
+%                                     = bgMatrix( jNewVeloBG, Field.nParticles, iRadius) ...
+%                                     + nColPlasma;
+%                             end
+%                         end
+%                        
+% %                             colProbBG = ...
+% %                                 (bgMatrix(jVelo, Field.nParticles, iRadius) ...
+% %                                 / binVolume(iRadius)) / (sum(bgMatrix(:, ...
+% %                                 Field.nParticles, iRadius)) / binVolume(iRadius) ) ...
+% %                                 * iVelo * timeDelta;
+%                     end
                     
 %                     % If the number of particles in current bin is larger
 %                     %   than the minimum number of particles
@@ -557,4 +574,12 @@ for iAngle = 1 : 1 % nAngle
         
     end % For time
     
+    for iRadius = 1 : (nRadius - 1)
+        nPlasma3D(iAngle, iRadius) = sum( plasmaMatrix(:, Field.nParticles, ...
+                                            iRadius, 1) );
+    end
+    
 end % For angle
+
+figure;
+surf(XPos, YPos, nPlasma3D, 'Edgecolor', 'none');
