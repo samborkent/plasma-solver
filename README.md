@@ -49,9 +49,27 @@ Field names and corresponding index value: (see Field enumeration class)
 * Field.O           (1)     Oxygen
 
 # Issues
-* When making crazy composite targets, lithium gain too much energy
+* When making crazy composite targets, lithium gains too much energy.
+* After sufficient time has passed all particles should be in the last
+    radial bin, this is not the case right now.
 
 # Change log
+
+10-03-21:
+* Renamed the current .m file to testPlasmaSolver.m, and created 
+    plasmaSolver.m which will only hold my own working code.
+* Managed to kind of reproduce 1D propagation, although with quantization
+    problem. And particles don't all go to the last radial bin eventually.
+* Created function to initialize and fill background matrix (fillBGMatrix).
+* Created nPlasmaParticlesPerRadius function that sums particles of all
+    velocity bins within current radial bin
+* Added envelope for plotting 1D propagation, which is normalized to
+    conserve the number of particles
+* Created angularDistribution function to calculate angular distribution
+    of plasma particles
+* Did rudementary collisions. It works, but the number of collisions is
+    too high and particles come to a stand still. Also background density
+    is assumed constant, background gas is not modeled yet.
 
 09-03-21:
 * Worked on main loop, made start with collisions, no propagation yet
@@ -141,7 +159,9 @@ Field names and corresponding index value: (see Field enumeration class)
 * Add date and time to config file
 
 # To do
-* Make the model work without collisions or oxidation
+* Include plotting of 1D propagation in nPlasmaParticlesPerRadius function
+* Check if a sparse matrix can be used for plasma
+* Clean up initialVelocityDistribution code
 * Replace divisions that are performed often with multiplications
 * Remove code that is unnecessary
 * Implement excitation energy

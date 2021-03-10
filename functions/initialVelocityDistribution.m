@@ -38,7 +38,7 @@ end
 
 % Make plot
 if plotBool
-    figVelDisInit = figure;
+    figVelDisInit = figure('Name', 'Initial Velocity Distribution');
     hold on;
     
     if densityRatio == 1
