@@ -30,6 +30,10 @@ composition.
     momentum is not conserved.
 * Collisions are only possible if the background particles move slower than
     the plume particles
+* All collisions with the background are with static background particles.
+    A moving background particle that collides with a static background
+    particle will interchange verlocity, resulting in no net change of
+    density.
 
 # Naming conventions
 Loosly resemble paper names and follow MATLAB style guidelines v1.3
@@ -50,8 +54,8 @@ Field names and corresponding index value: (see Field enumeration class)
 
 # Issues
 * When making crazy composite targets, lithium gains too much energy.
-* After sufficient time has passed all particles should be in the last
-    radial bin, this is not the case right now.
+* How to deal with preventing negative particles to occur while assuring
+    conservation of particles?
 
 # Change log
 
