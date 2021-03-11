@@ -192,8 +192,10 @@ plasmaMatrix = zeros(nVelo, nRadius);
 
 %% Angular plasma particle distribution
 
-nParticleAngle = angularDistribution( angle, radiusDelta, ...
-                                        cosPowerFit, nAtomAblated );
+nParticleAngle = angularDistribution( angle,        ...
+                                      radiusDelta,  ...
+                                      cosPowerFit,  ...
+                                      nAtomAblated );
 
 %% Initialize figures
 
@@ -217,13 +219,25 @@ for iAngle = 1 : 1 % (nAngle - 1)
     
     % Pre-allocate background gas particle matrix and fill based on
     %   calculated density
-    bgMatrix = fillBGMatrix( bgDensity, nVelo, radius, angle, iAngle );
+    [bgMatrix, binVolume] = fillBGMatrix( bgDensity,    ...
+                                          nVelo,        ...
+                                          radius,       ...
+                                          angle,        ...
+                                          iAngle );
     
     % Calculate the initial particle velocity distribution
-    nPlasmaVeloInit = initialVelocityDistribution( plotVelDisInit, ...
-                        plotVelDisInit, velo, 1500, nUCAblated, uc, ...
-                        1, energyLaser, 0, 0.6, ...
-                        nParticleAngle(iAngle), 1 );
+    nPlasmaVeloInit = initialVelocityDistribution( plotVelDisInit,          ...
+                                                   saveVelDisInit,          ...
+                                                   velo,                    ...
+                                                   1500,                    ...
+                                                   nUCAblated,              ...
+                                                   uc,                      ...
+                                                   1,                       ...
+                                                   energyLaser,             ...
+                                                   0,                       ...
+                                                   0.6,                     ...
+                                                   nParticleAngle(iAngle),  ...
+                                                   1 );
                     
     % Only plot and save initial particle velocity distribution for the
     %   center of the plume
@@ -255,7 +269,7 @@ for iAngle = 1 : 1 % (nAngle - 1)
                 % Number of plasma particles in current bin
                 nPlasma = plasmaMatrix(iVelo, iRadius);
                 
-                % Remove all particles from current bin
+                % Remove all plasma particles from current bin
                 plasmaMatrix(iVelo, iRadius) = 0;
                 
                 % Skip bin if the number of particles is lower than the
@@ -267,53 +281,149 @@ for iAngle = 1 : 1 % (nAngle - 1)
                 % Restrict number of traveled bins to the total number of
                 %   radial bins
                 if ( iRadius + nRadiusTraveled(iVelo) ) > nRadius
-                    nRadiusVelo = nRadius - iRadius;
+                    nRadiusDelta = nRadius - iRadius;
                 else
-                    nRadiusVelo = nRadiusTraveled(iVelo);
+                    nRadiusDelta = nRadiusTraveled(iVelo);
                 end
                 
                 %% TEST COLLISIONS
                 
-                % Collision probability of plasma particle with background
-                %   gas particle
-                colProb = timeDelta * velo(iVelo) * sigma * bgDensity;
-                
-                % If the collision probability is greater than 1, all
-                %   particles collide
-                if colProb > 1
-                    colProb = 1;
-                end
-                
-                colProb = colProb * 0.5;
-                
-                % Number of colliding particles
-                nColPlasma = colProb * nPlasma;
-                
-                % Number of non-colliding particles
-                nPlasma = nPlasma - nColPlasma;
-                
-                % Calculate new velocity after collision (eq. 6)
-                iNewVelo = round( iVelo * ((mass - massBG) ...
-                                        / (mass + massBG)) );
-                
-                % Prevent index out-of-range error
-                if iNewVelo < 1
-                    iNewVelo = 1;
-                elseif iNewVelo > nVelo
-                    iNewVelo = nVelo;
-                end
-                
+                % Calculate new velocities after collision (eq. 6,7)
+                iNewVelo = round( iVelo * (mass - massBG) ...
+                                        / (mass + massBG) );
+                                    
                 % Place colliding particles in new radial bin with altered
                 %   velocity
-                plasmaMatrix(iNewVelo, iRadius + nRadiusVelo) = nColPlasma ...
-                    + plasmaMatrix(iNewVelo, iRadius + nRadiusVelo);
-                
+                plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) = nColPlasma ...
+                    + plasmaMatrix(iNewVelo, iRadius + nRadiusDelta);
+
                 % Place non-colliding particles in the new radial bin
                 %   with unaltered velocity
-                plasmaMatrix(iVelo, iRadius + nRadiusVelo) = nPlasma ...
-                    + plasmaMatrix(iVelo, iRadius + nRadiusVelo);
+                plasmaMatrix(iVelo, iRadius + nRadiusDelta) = nPlasma ...
+                    + plasmaMatrix(iVelo, iRadius + nRadiusDelta);
+                
+%                 % Only consider background particles that move slower than
+%                 %   plume particles
+%                 for jVelo = 1 : (iVelo - 1)
+%                     %% Calculations per background gas velocity bin
+% 
+%                     % Number of background gas particles in current bin
+%                     nBG = bgMatrix(jVelo, iRadius);
+% 
+%                     % Skip bin if the number of particles is lower than the
+%                     %   minimum number of particles specified
+%                     if nBG < minNPlasma
+%                         continue
+%                     end
+%                     
+%                     % Restrict number of traveled bins to the total number of
+%                     %   radial bins
+%                     if ( iRadius + nRadiusTraveled(jVelo) ) > nRadius
+%                         nRadiusVeloBG = nRadius - iRadius;
+%                     else
+%                         nRadiusVeloBG = nRadiusTraveled(jVelo);
+%                     end
+% 
+%                     % Background density per velocity bin
+%                     bgDensityVelo = nBG / binVolume(iRadius);
+% 
+%                     % Collision probability of plasma particle with
+%                     %   background gas particle
+%                     colProb = nRadiusVelo * radiusDelta * sigma ...
+%                                 * bgDensityVelo;
+% 
+%                     % Scale the collision probability to the velocity
+%                     %   difference bewteen the plasma and background
+%                     %   particles
+%                     colProd = colProb * (iVelo - jVelo) ...
+%                                       / (iVelo + jVelo);
+% 
+%                     % If the collision probability is greater than 1, all
+%                     %   particles collide
+%                     if colProb > 1
+%                         colProb = 1;
+%                     end
+% 
+%                     % If the collision probability is smaller than 1, the
+%                     %   background gas is faster than the plume particle
+%                     %   and no particles collide
+%                     if colProd < 0
+%                         colProd = 0;
+%                     end
+%                     
+%                     % Number of colliding particles
+%                     nColPlasma = colProb * nPlasma;
+%                     
+%                     % Number of non-colliding particles
+%                     nNonPlasma = nPlasma - nColPlasma;
+%                     
+%                     jNewVelo = round ( 2 * mass * iVelo ...
+%                                         / (mass + massBG) );
+% 
+%                     % Prevent index out-of-range error
+%                     if iNewVelo < 1
+%                         iNewVelo = 1;
+%                     elseif iNewVelo > nVelo
+%                         iNewVelo = nVelo;
+%                     end
+%                     if jNewVelo < 1
+%                         jNewVelo = 1;
+%                     elseif jNewVelo > nVelo
+%                         jNewVelo = nVelo;
+%                     end
+%                     
+%                     % Subtract number of particles from background that
+%                     %   have collided
+%                     bgMatrix(jVelo, iRadius) = -nColPlasma ...
+%                         + bgMatrix(jVelo, iRadius);
+%                     
+%                     bgMatrix(jNewVelo, iRadius) = nColPlasma ...
+%                         + bgMatrix(jNewVelo, iRadius);
+%                     
+%                 end % Background velocity loop
+                
+                %% TEST COLLISIONS SIMPLEST
+%                 
+%                 % Collision probability of plasma particle with background
+%                 %   gas particle
+%                 colProb = timeDelta * velo(iVelo) * sigma * bgDensity;
+%                 
+%                 % If the collision probability is greater than 1, all
+%                 %   particles collide
+%                 if colProb > 1
+%                     colProb = 1;
+%                 end
+%                 
+%                 colProb = colProb * 0.5;
+%                 
+%                 % Number of colliding particles
+%                 nColPlasma = colProb * nPlasma;
+%                 
+%                 % Number of non-colliding particles
+%                 nPlasma = nPlasma - nColPlasma;
+%                 
+%                 % Calculate new velocity after collision (eq. 6)
+%                 iNewVelo = round( iVelo * ((mass - massBG) ...
+%                                         / (mass + massBG)) );
+%                 
+%                 % Prevent index out-of-range error
+%                 if iNewVelo < 1
+%                     iNewVelo = 1;
+%                 elseif iNewVelo > nVelo
+%                     iNewVelo = nVelo;
+%                 end
+%                 
+%                 % Place colliding particles in new radial bin with altered
+%                 %   velocity
+%                 plasmaMatrix(iNewVelo, iRadius + nRadiusVelo) = nColPlasma ...
+%                     + plasmaMatrix(iNewVelo, iRadius + nRadiusVelo);
+%                 
+%                 % Place non-colliding particles in the new radial bin
+%                 %   with unaltered velocity
+%                 plasmaMatrix(iVelo, iRadius + nRadiusVelo) = nPlasma ...
+%                     + plasmaMatrix(iVelo, iRadius + nRadiusVelo);
 
-            end % Velocity loop
+            end % Plasma velocity loop
 
         end % Radial loop
         

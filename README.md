@@ -18,7 +18,7 @@ composition.
 * Identical particles are assumed to seperate in space due to their
     initial velocity distribution, thus collisions between identical
     particles are neglected.
-* The background gas starts out with zero velocity, as the room tempreature
+* The background gas starts out with zero velocity, as the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plume
     particle velocities. The particles in the background gas don't have a
     preferential direction, so their average velocity zeros out.
