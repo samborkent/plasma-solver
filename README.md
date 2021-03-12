@@ -59,6 +59,9 @@ Field names and corresponding index value: (see Field enumeration class)
 
 # Change log
 
+12-03-21:
+* Made a collisionProbability function to try to make things work.
+
 10-03-21:
 * Renamed the current .m file to testPlasmaSolver.m, and created 
     plasmaSolver.m which will only hold my own working code.
@@ -163,6 +166,7 @@ Field names and corresponding index value: (see Field enumeration class)
 * Add date and time to config file
 
 # To do
+* Implement collision probability as described in documentation
 * Include plotting of 1D propagation in nPlasmaParticlesPerRadius function
 * Check if a sparse matrix can be used for plasma
 * Clean up initialVelocityDistribution code
