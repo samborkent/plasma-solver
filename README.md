@@ -59,6 +59,10 @@ Field names and corresponding index value: (see Field enumeration class)
 
 # Change log
 
+18-03-21:
+* Implemented first working version of collision with one species and
+    background. Still needs to be validated.
+
 12-03-21:
 * Made a collisionProbability function to try to make things work.
 
