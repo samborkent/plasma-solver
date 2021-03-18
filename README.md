@@ -15,13 +15,10 @@ composition.
 
 # Assumptions
 * The excitation energy of the atoms in the unit cell are neglected.
-* Identical particles are assumed to seperate in space due to their
-    initial velocity distribution, thus collisions between identical
-    particles are neglected.
 * The background gas starts out with zero velocity, as the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plume
-    particle velocities. The particles in the background gas don't have a
-    preferential direction, so their average velocity zeros out.
+    particle velocities. The particles in the background gas do not have a
+    preferential direction, so their net velocity is zero.
 * Only head-on collisions are included, so there is no net exchange of
     particles between angular bins.
 * Particles can only gain positive momentum, when a lighter plasma particle
@@ -30,38 +27,33 @@ composition.
     momentum is not conserved.
 * Collisions are only possible if the background particles move slower than
     the plume particles
-* All collisions with the background are with static background particles.
-    A moving background particle that collides with a static background
-    particle will interchange verlocity, resulting in no net change of
-    density.
+* Collisions of species with the same mass are neglected, as for
+    completely elastic collisions they would interchange velocities,
+    resulting in no net change of density.
 
 # Naming conventions
-Loosly resemble paper names and follow MATLAB style guidelines v1.3
+Follow MATLAB style guidelines v1.3
 
-* radius    : Radius / Distance
-* velo      : Velocity
-* dist      : Distribution
-* init      : Initial
-* n         : Number of particles
-* bg        : Background gas
-* uc        : Unit cell
-* bin       : Computational bin with similar position, velocity, etc.
-
-Field names and corresponding index value: (see Field enumeration class)
-* Field.nParticles  (1)     Number of particles
-* Field.nCollisions (2)     Number of collisions
-* Field.O           (1)     Oxygen
+* bg      : Background
+* bin     : Computational bin with similar position and velocity
+* n       : Number of particles/bins
+* velo    : Velocity
+* uc      : Unit cell
 
 # Issues
+* The number of plasma particles is not conserved. Negative number of plasma
+    particles is possible. Negative collision probability is possible.
 * When making crazy composite targets, lithium gains too much energy.
-* How to deal with preventing negative particles to occur while assuring
-    conservation of particles?
 
 # Change log
 
 18-03-21:
 * Implemented first working version of collision with one species and
     background. Still needs to be validated.
+* Added debug messages (labeled [DEBUG]) for mean collision probability,
+    collision probability per bin, and number of particles.
+* Included normalization facotr for velocity weight factors.
+* Added some default values.
 
 12-03-21:
 * Made a collisionProbability function to try to make things work.
@@ -170,7 +162,6 @@ Field names and corresponding index value: (see Field enumeration class)
 * Add date and time to config file
 
 # To do
-* Implement collision probability as described in documentation
 * Include plotting of 1D propagation in nPlasmaParticlesPerRadius function
 * Check if a sparse matrix can be used for plasma
 * Clean up initialVelocityDistribution code

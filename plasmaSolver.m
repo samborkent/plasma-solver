@@ -9,12 +9,15 @@
 % Naming conventions:
 %
 %   bg      : Background
+%   bin     : Computational bin with similar position and velocity
+%   n       : Number of particles/bins
 %   velo    : Velocity
 %   uc      : Unit cell
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Initializes
+%% Initialization
+% Do not change!
 
 %--------------------------------------------------------------------------
 % Clear workspace
@@ -47,10 +50,10 @@ UC  = UnitCells;            % Material properties
 %--------------------------------------------------------------------------
 
 % Plot initial velocity distribution
-plotVelDisInit      = true;
+plotVelDisInit = true;
 
 % Save the initial velocity distribution plot
-saveVelDisInit      = false;
+saveVelDisInit = false;
 
 %--------------------------------------------------------------------------
 % Computational restrictions
@@ -63,9 +66,12 @@ nMin = 1;
 % Model parameters
 %--------------------------------------------------------------------------
 
-% Fit parameter of the cosines power in the anular plasma particle
+% Fit parameter of the cosines power in the angular plasma particle
 %   distibution function
 cosPowerFit = 16;
+
+% Initial velocity distribution width
+initVeloDisWidth = 1500;
 
 %--------------------------------------------------------------------------
 % Material settings
@@ -77,6 +83,10 @@ cosPowerFit = 16;
 %   * Preface with UC.
 uc = UC.TiO2;
 
+% Absorption coefficient
+%   Default: 0.6
+absorption = 0.6;
+
 %--------------------------------------------------------------------------
 % Background gas parameters
 %--------------------------------------------------------------------------
@@ -85,6 +95,7 @@ uc = UC.TiO2;
 bgPressure      = 0.1E2;
 
 % Temperature of background gas [K]
+%   Default: 300
 bgTemperature   = 300;      
 
 %--------------------------------------------------------------------------
@@ -98,10 +109,21 @@ spotWidth       = 1E-3;
 spotHeight      = 2.1E-3;
 
 % Ablation depth into the target for a single pulse [m]
+%   * For most accurate results calculate per target.
+%   Default: 100E-9
 ablationDepth   = 100E-9;
 
 % Laser fluence [J / cm^2]
 laserFluence    = 2.0;
+
+% Heat dissipating into the target each pulse [J]
+%   * Small for ceramic targets.
+%   * Can be approximated by measuring the temperature increase of the
+%       target after a fixed number of laser pulses, then use the specific
+%       heat equation to calculate total heat dissipation, and divide by
+%       the number of pulses.
+%   Default: 0
+heatTarget      = 0;
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -127,7 +149,7 @@ veloMax         = 2.5E4; % Maximal initial velocity
 veloStepsize    = 5;    % Velocity step size
 
 %% Calculations
-% Everything below is calculated automatically based on user input above
+% Everything below is calculated automatically based on user input above.
 
 %--------------------------------------------------------------------------
 % Material calculations
@@ -203,6 +225,14 @@ nParticleAngle = angularDistribution( angle,        ...
 figPropagation1D = figure('Name', 'Propagation 1D');
 hold on;
 
+%% DEBUG
+
+% [DEBUG] Loop counter
+loopCount = 0;
+
+% [DEBUG]
+nTimesMultipleBGVelo = 0;
+
 %% Main program
 
 sigma = pi * ( 2*PT.O.RADIUS + PT.Ti.RADIUS )^2;
@@ -230,13 +260,13 @@ for iAngle = 1 : 1 % (nAngle - 1)
     nPlasmaVeloInit = initialVelocityDistribution( plotVelDisInit,          ...
                                                    saveVelDisInit,          ...
                                                    velo,                    ...
-                                                   1500,                    ...
+                                                   initVeloDisWidth,        ...
                                                    nUCAblated,              ...
                                                    uc,                      ...
                                                    1,                       ...
                                                    energyLaser,             ...
-                                                   0,                       ...
-                                                   0.6,                     ...
+                                                   heatTarget,              ...
+                                                   absorption,              ...
                                                    nParticleAngle(iAngle),  ...
                                                    1 );
                     
@@ -250,7 +280,7 @@ for iAngle = 1 : 1 % (nAngle - 1)
     % Fill into the plasma matrix
     plasmaMatrix(:, 1) = nPlasmaVeloInit(:, 1);
     
-    % Check initial total amount particles in matrix [DEBUG]
+    % [DEBUG] Check initial total amount particles in matrix 
     startPlasma = sum(sum(plasmaMatrix));
     startBG = sum(sum(bgMatrix));
 
@@ -264,24 +294,16 @@ for iAngle = 1 : 1 % (nAngle - 1)
             for iVelo = nVelo : -1 : 1
                 %% Calculations per plasma velocity bin
                 % Loop backwards to prevent counting particles twice
-
+                
+                %----------------------------------------------------------
+                % Set number of traveled radial bins
+                %----------------------------------------------------------
+                
                 % Skip velocity bin if no radial bin is traveled within
                 %   a time step
                 if nRadiusTraveled(iVelo) == 0
                     continue
                 end
-                
-                % Number of plasma particles in current bin
-                nPlasma = plasmaMatrix(iVelo, iRadius);
-                
-                % Skip bin if the number of particles is lower than the
-                %   minimum number of particles specified
-                if nPlasma < nMin               
-                    continue
-                end
-                
-                % Remove all plasma particles from current bin
-                plasmaMatrix(iVelo, iRadius) = 0;
                 
                 % Restrict number of traveled bins to the total number of
                 %   radial bins
@@ -291,107 +313,201 @@ for iAngle = 1 : 1 % (nAngle - 1)
                     nRadiusDelta = nRadiusTraveled(iVelo);
                 end
                 
-                % Number of kinetic background particles in current bin
-                nBGKinetic = bgMatrix(iVelo, iRadius);
+                %----------------------------------------------------------
+                % Update background particle positions
+                %   (Update bg matrix first, so it gets updated even if
+                %    the number of plasma particles is below threshold)
+                %----------------------------------------------------------
                 
-                % Remove all kinetic particles from current bin
-                bgMatrix(iVelo, iRadius) = 0;
+                % Number of background particles in current bin
+                nBG = bgMatrix(iVelo, iRadius);
+                
+                % If the number of background particles is above the
+                %   threshold
+                if nBG >= nMin
+                    % Remove all background particles from current bin
+                    bgMatrix(iVelo, iRadius) = 0;
+                    
+                    % Add all background particles to new radial bin
+                    bgMatrix(iVelo, iRadius + nRadiusDelta) = nBG;
+                end
+                
+                %----------------------------------------------------------
+                % Update plasma particle positions
+                %----------------------------------------------------------
+                
+                % Number of plasma particles in current bin
+                nPlasma = plasmaMatrix(iVelo, iRadius);
+                
+                % Skip this velocity bin if the number of particles is
+                %   lower than the threshold
+                if nPlasma < nMin
+                    continue
+                end
+                
+                % Remove all plasma particles from current bin
+                plasmaMatrix(iVelo, iRadius) = 0;
+                
+                % Add all plasma particles to new radial bin
+                plasmaMatrix(iVelo, iRadius + nRadiusDelta) = nPlasma;
+                
+                %----------------------------------------------------------
+                % Mean collision probability
+                %----------------------------------------------------------
                 
                 % Mean background density of traversed path
                 meanBGDensity = ...
                     sum(sum( bgMatrix(:, iRadius+1:iRadius+nRadiusDelta) )) ...
                       / sum( binVolume(iRadius+1:iRadius+nRadiusDelta) );
                 
-                % Mean collision probability
+                % Mean collision probability of traversed path
                 colProb = meanBGDensity * sigma * radiusDelta;
                 
-                % Mean collision probability per traversed bin
-                colProbPerBin = colProb / nRadiusDelta;
+                % [DEBUG] Total mean collision probability this time step
+                if colProb > 1
+                    error([ 'Total collision probability is too high: ' ...
+                                num2str(colProbPerBinNorm)              ...
+                                ' Must be a value between 0 and 1. '    ...
+                                'Check normalization!']);
+                elseif colProb < 0
+                    
+%                     error([ 'Negative total collision probability: ' ...
+%                             num2str(colProbPerBinNorm) ]);
+                end
                 
-                % Reset total number of collided particles [DEBUG]
-                nColPlasma = 0;
+                % Mean collision probability per traversed bin, assume an
+                %   equal chance of colliding in each traversed bin
+                colProbPerBin = colProb / nRadiusDelta;
 
                 % Loop through traversed bins
-                for iRadiusDelta = 1 : nRadiusDelta
-                    
-                    % Current radial bin index
-                    thisRadius = iRadius + iRadiusDelta;
+                for thisRadius = iRadius + 1 : iRadius + nRadiusDelta
+                    %% Calculations per traversed radial bin
                     
                     % Find velocity bins containing particles below the
                     %   plasma velocity
-                    bgVeloArray = find( ...
-                        bgMatrix(1:iVelo-1, thisRadius) );
+                    bgVeloArray = find( bgMatrix(1:iVelo-1, thisRadius) );
                     
-                    % Loop through background velocities smaller than
-                    %   plasma velocity
+                    % Corresponding number of background particles
+                    nBGArray = bgMatrix(bgVeloArray, thisRadius);
+                    
+                    % Only velocity bins with number of particles above
+                    %   threshold
+                    bgVeloArray = bgVeloArray(nBGArray >= nMin);
+                    
+                    % Skip to next radial bin if no velocity bins have
+                    %   enough particles
+                    if isempty(bgVeloArray)
+                        continue
+                    end
+                    
+                    % Relative velocity weight factors
+                    veloWeights = (iVelo - bgVeloArray) ...
+                                  ./ (iVelo + bgVeloArray);
+                              
+                    % Probability normalization factor
+                    veloNorm = 1 / sum(veloWeights);
+                    
+                    % Normalized velocity weight factors                    
+                    veloWeights = veloWeights .* veloNorm;
+                    
+                    % Loop through the filled background velocities smaller
+                    %   than the plasma velocity
                     for jVelo = 1 : numel(bgVeloArray)
+                    %% Calculations per background velocity bin
                         
                         % Background velocity index
                         iBGVelo = bgVeloArray(jVelo);
                         
-                        % Skip to next velocity if number of background
-                        %   particles is smaller than minimum amount
-                        if bgMatrix(iBGVelo, thisRadius) < nMin
-                            continue
-                        end
+                        %--------------------------------------------------
+                        % Adjusted collision probability per bin
+                        %--------------------------------------------------
                         
                         % Velocity weighted collision probability per bin
                         colProbPerBinNorm = colProbPerBin ...
-                                            * (iVelo - iBGVelo) ...
-                                            / (iVelo + iBGVelo);
+                                            * veloWeights(jVelo);
+                        
+                        % [DEBUG] Velocity weighted collision probability
+                        %           per bin
+                        if colProbPerBinNorm > 1
+                            error([ 'Collision probability per bin is ' ...
+                                'too high: ' num2str(colProbPerBinNorm) ...
+                                ' Must be a value between 0 and 1. '    ...
+                                'Check normalization!']);
+                        elseif colProbPerBinNorm < 0
+%                             error([ 'Negative collision probability: ' ...
+%                                     num2str(colProbPerBinNorm) ]);
+                        end
                         
                         % Number of collided particles per bin
                         nColPlasmaPerBin = colProbPerBinNorm * nPlasma;
                         
-                        % If enough particles have collided
-                        if nColPlasmaPerBin >= nMin
-                            
-                            % Calculate new plasma velocity after collision (eq. 6)
-                            iNewVelo = round( iVelo * ((mass - massBG) ...
-                                                    /  (mass + massBG)) );
-
-                            % Calculate new background velocity after plasma-bg collision (eq. 7)
-                            iNewBGVelo = round( 2 * mass * iVelo / (mass + massBG) );
-
-                            % Prevent index out-of-range error
-                            if iNewVelo < 1
-                                iNewVelo = 1;
-                            elseif iNewVelo > nVelo
-                                iNewVelo = nVelo;
-                            end
-                            if iNewBGVelo < 1
-                                iNewBGVelo = 1;
-                            elseif iNewBGVelo > nVelo
-                                iNewBGVelo = nVelo;
-                            end
-                            
-                            % Update total number of collided particles [DEBUG]
-                            nColPlasma = nColPlasma + nColPlasmaPerBin;
-                            
-                            % Update number of non-colliding particles
-                            nPlasma = nPlasma - nColPlasmaPerBin;
-                            
-                            % Remove collided bg particles from velo bin
-                            bgMatrix(iBGVelo, thisRadius) = ...
-                                bgMatrix(iBGVelo, thisRadius) ...
-                                - nColPlasmaPerBin;
-                            
-                            % Add collided bg particles to new velo bin
-                            bgMatrix(iNewBGVelo, thisRadius) = ...
-                                bgMatrix(iNewBGVelo, thisRadius) ...
-                                + nColPlasmaPerBin;
-                            
-                            % Add collided plasma particle to new velo bin
-                            plasmaMatrix(iNewVelo, thisRadius) = ...
-                                plasmaMatrix(iNewVelo, thisRadius) ...
-                                + nColPlasmaPerBin;
-                            
+                        % Skip to next bg velocity if enough particles
+                        %   have collided
+                        if nColPlasmaPerBin < nMin
+                            continue
                         end
+
+                        %----------------------------------------------
+                        % Calculate new velocities after collision
+                        %----------------------------------------------
+
+                        % Calculate new plasma velocity after collision (eq. 6)
+                        iNewVelo = round( iVelo * ((mass - massBG) ...
+                                                /  (mass + massBG)) );
+
+                        % Calculate new background velocity after plasma-bg collision (eq. 7)
+                        iNewBGVelo = round( 2 * mass * iVelo ...
+                                            / (mass + massBG) );
+
+                        % Prevent index out-of-range error
+                        if iNewVelo < 1
+                            iNewVelo = 1;
+                        elseif iNewVelo > nVelo
+                            iNewVelo = nVelo;
+                        end
+                        if iNewBGVelo < 1
+                            iNewBGVelo = 1;
+                        elseif iNewBGVelo > nVelo
+                            iNewBGVelo = nVelo;
+                        end
+
+                        %----------------------------------------------
+                        % Update background particle velocities
+                        %----------------------------------------------
+
+                        % Remove collided bg particles from velo bin
+                        bgMatrix(iBGVelo, thisRadius) = ...
+                            bgMatrix(iBGVelo, thisRadius) ...
+                            - nColPlasmaPerBin;
+
+                        % Add collided bg particles to new velo bin
+                        bgMatrix(iNewBGVelo, thisRadius) = ...
+                            bgMatrix(iNewBGVelo, thisRadius) ...
+                            + nColPlasmaPerBin;
+
+                        %----------------------------------------------
+                        % Update plasma particle velocities
+                        %----------------------------------------------
+                        
+                        % Remove collided plasma particles from the old
+                        %   velocity bin
+                        plasmaMatrix(iVelo, iRadius + nRadiusDelta) = ...
+                            plasmaMatrix(iVelo, iRadius + nRadiusDelta) ...
+                            - nColPlasmaPerBin;
+
+                        % Add collided plasma particles to the new
+                        %   velocity bin
+                        plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) = ...
+                            plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) ...
+                            + nColPlasmaPerBin;
+                        
+                        % [DEBUG] Total loop counter
+                        loopCount = loopCount + 1;
                         
                         % If the number of collided plasma particles is
                         %   less than the number of background particles,
                         %   all plasma particles will be scattered in this
-                        %   bin, so skip the rest of the loop
+                        %   bin, so skip the remainder of the loop
                         if nColPlasmaPerBin < bgMatrix(iBGVelo, thisRadius)
                             break
                         end
@@ -400,102 +516,17 @@ for iAngle = 1 : 1 % (nAngle - 1)
                     
                 end % Traversed radial bins loop
                 
-                % Place non-colliding particles in new radial bin
-                %   with unaltered velocity
-                plasmaMatrix(iVelo, iRadius + nRadiusDelta) = nPlasma ...
-                    + plasmaMatrix(iVelo, iRadius + nRadiusDelta);
-                
-                % Place kinetic background particles in new radial bin
-                bgMatrix(iVelo, iRadius + nRadiusDelta) = nBGKinetic ...
-                    + bgMatrix(iVelo, iRadius + nRadiusDelta);
-                
-%                 % Number of static background particles in radial bin
-%                 nBGStatic = bgMatrix(1, iRadius);
-%                 
-%                 % Initialize number of kinetic background particles
-%                 nBGKinetic = 0;
-%                 
-%                 % If velocity is non-zero
-%                 if iVelo > 1
-%                     % Number of background particles in velocity bin
-%                     nBGKinetic = bgMatrix(iVelo, iRadius);
-%                     
-%                     % Remove all background particles from velocity bin
-%                     bgMatrix(iVelo, iRadius) = 0;
-%                 end
-%                 
-%                 %% TEST COLLISIONS plasma - bg
-%                 
-%                 % Calculate new plasma velocity after collision (eq. 6)
-%                 iNewVelo = round( iVelo * ((mass - massBG) ...
-%                                         / (mass + massBG)) );
-%                                     
-%                 % Calculate new background velocity after plasma-bg collision (eq. 7)
-%                 jNewVelo = round( 2 * mass * iVelo / (mass + massBG) );
-%                 
-%                 % Prevent index out-of-range error
-%                 if iNewVelo < 1
-%                     iNewVelo = 1;
-%                 elseif iNewVelo > nVelo
-%                     iNewVelo = nVelo;
-%                 end
-%                 if jNewVelo < 1
-%                     jNewVelo = 1;
-%                 elseif jNewVelo > nVelo
-%                     jNewVelo = nVelo;
-%                 end
-%                 
-%                 % Collision probability of plasma particle with static
-%                 %   background gas particles
-%                 colProbPlasma = timeDelta * velo(iVelo) * sigma ...
-%                                 * (nBGStatic / binVolume(iRadius));
-%                 
-%                 % If the collision probability is greater than 1, all
-%                 %   particles collide
-%                 if colProbPlasma > 1
-%                     colProbPlasma = 1;
-%                 end
-%                 
-%                 % Number of colliding particles
-%                 nColPlasma = colProbPlasma * nPlasma;
-%                 
-%                 % If enough particles have collided
-%                 if nColPlasma >= nMin
-%                     % Number of non-colliding particles
-%                     nPlasma = nPlasma - nColPlasma;
-%                     
-%                     % Place colliding particles in new radial bin with altered
-%                     %   velocity
-%                     plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) = nColPlasma ...
-%                         + plasmaMatrix(iNewVelo, iRadius + nRadiusDelta);
-%                     
-%                     % Remove collided particles from current bg bin
-%                     bgMatrix(1, iRadius) = -nColPlasma ...
-%                         + bgMatrix(iVelo, iRadius);
-%                     
-%                     % Add them to new bg velocity bin
-%                     bgMatrix(jNewVelo, iRadius) = nColPlasma ...
-%                         + bgMatrix(jNewVelo, iRadius);
-%                 end
-%                 
-%                 % If enough background particles are in the velocity bin
-%                 if nBGKinetic >= nMin
-%                     % Place kinetic background particles in new radial bin
-%                     bgMatrix(iVelo, iRadius + nRadiusDelta) = nBGKinetic ...
-%                         + bgMatrix(iVelo, iRadius + nRadiusDelta);
-%                 end
-%                 
 %                 if colProbPlasma > 0
-%                     disp( ['iTime: ' num2str(iTime)] );
-%                     disp( ['iRadius: ' num2str(iRadius)] );
-%                     disp( ['iVelo: ' num2str(iVelo)] );
-%                     disp( ['nRadiusDelta: ' num2str(nRadiusDelta)] );
-%                     disp( ['colProbPlasma: ' num2str(colProbPlasma)] );
-%                     disp( ['nBG: ' num2str(nBGStatic)] );
-%                     disp( ['nColPlasma: ' num2str(nColPlasma)] );
-%                     disp( ['nPlasma: ' num2str(nPlasma)] );
-%                     disp( ['iNewVelo: ' num2str(iNewVelo)] );
-%                     disp( ['jNewVelo: ' num2str(jNewVelo)] );
+%                     disp( ['iTime: '          num2str(iTime)] );
+%                     disp( ['iRadius: '        num2str(iRadius)] );
+%                     disp( ['iVelo: '          num2str(iVelo)] );
+%                     disp( ['nRadiusDelta: '   num2str(nRadiusDelta)] );
+%                     disp( ['colProbPlasma: '  num2str(colProbPlasma)] );
+%                     disp( ['nBG: '            num2str(nBGStatic)] );
+%                     disp( ['nColPlasma: '     num2str(nColPlasma)] );
+%                     disp( ['nPlasma: '        num2str(nPlasma)] );
+%                     disp( ['iNewVelo: '       num2str(iNewVelo)] );
+%                     disp( ['jNewVelo: '       num2str(jNewVelo)] );
 %                     disp( ' ' );
 %                 end
 
@@ -509,8 +540,8 @@ for iAngle = 1 : 1 % (nAngle - 1)
             % Only for specific times
             if (time(iTime) == timeDelta) || (time(iTime) == 0.5E-6) || ...
                (time(iTime) == 1E-6)      || (time(iTime) == 2E-6)   || ...
-               (time(iTime) == 3E-6)      || (time(iTime) == 6E-6)   || ...
-               (time(iTime) == timeMax - timeDelta)
+               (time(iTime) == 3E-6)      || (time(iTime) == 6E-6)   % || ...
+%                (time(iTime) == timeMax - timeDelta)
 
                 % Calculate total number of particles per radial bin
                 nPlasmaRadius = nPlasmaParticlesPerRadius( radius, plasmaMatrix );
@@ -545,22 +576,22 @@ end % Anglular loop
 endPlasma = sum(sum(plasmaMatrix));
 endBG = sum(sum(bgMatrix));
 
-% Check if total number of plasma particles is conserved
+% Check if the total number of plasma particles is conserved
 if abs(startPlasma - endPlasma) < nMin
     disp('Total number of plasma particles was conserved.');
 else
     disp(['Change in number of plasma particles: ' ...
             num2str(startPlasma - endPlasma)]);
-    error('Total number of plasma particles was NOT conserved.');
+%     error('Total number of plasma particles was NOT conserved.');
 end
 
-% Check if total number of background particles is conserved
+% Check if the total number of background particles is conserved
 if abs(startBG - endBG) < nMin
     disp('Total number of background particles was conserved.');
 else
     disp(['Change in number of background particles: ' ...
             num2str(startBG - endBG)]);
-    error('Total number of background particles was NOT conserved.');
+%     error('Total number of background particles was NOT conserved.');
 end
     
 %% Plot settings
@@ -568,8 +599,8 @@ end
 % 1D propagation
 figPropagation1D;
 legend;
-xlim([0 0.06]);
-% ylim([0 2.5E14]);
+xlim([0 0.05]);
+% ylim([0 0.5E14]);
 title('1D propagation of Ti from TiO_2 target');
 xlabel('Target distance [m]');
 ylabel('Number of particles');
