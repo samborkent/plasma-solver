@@ -16,15 +16,14 @@ composition.
 # Assumptions
 * The excitation energy of the atoms in the unit cell are neglected.
 * The background gas starts out with zero velocity, as the room temperature
-    velocity is aroung 400 m/s, which is two orders smaller than the plume
+    velocity is aroung 400 m/s, which is two orders smaller than the plasma
     particle velocities. The particles in the background gas do not have a
     preferential direction, so their net velocity is zero.
-* Only head-on collisions are included, so there is no net exchange of
+* Only head-on collisions are included, there is no net exchange of
     particles between angular bins.
-* Particles can only gain positive momentum, when a lighter plasma particle
-    collides with a heavier background gas particle its momentum is set to
-    zero, and the background gas particle gains a little momentum, so
-    momentum is not conserved.
+* Particles can only gain positive momentum. When a light particle collides
+    with a heavier particle, its momentum is set to zero, and the heavy
+    particle gains a little momentum, so momentum is not conserved.
 * Collisions are only possible if the background particles move slower than
     the plume particles
 * Collisions of species with the same mass are neglected, as for
@@ -42,10 +41,15 @@ Follow MATLAB style guidelines v1.3
 
 # Issues
 * The number of plasma particles is not conserved. Negative number of plasma
-    particles is possible. Negative collision probability is possible.
+    particles is possible.
 * When making crazy composite targets, lithium gains too much energy.
 
 # Change log
+
+20-03-21:
+* Added condition that the number of collided particles is limited by the
+    the species with lowest number of particles in that bin to avoid
+    negative collision probabilities.
 
 18-03-21:
 * Implemented first working version of collision with one species and
@@ -162,26 +166,21 @@ Follow MATLAB style guidelines v1.3
 * Add date and time to config file
 
 # To do
+* Replace find with logical indexing in the
 * Include plotting of 1D propagation in nPlasmaParticlesPerRadius function
-* Check if a sparse matrix can be used for plasma
 * Clean up initialVelocityDistribution code
 * Replace divisions that are performed often with multiplications
-* Remove code that is unnecessary
 * Implement excitation energy
-* Preacclocate object arrays
-* Add correcting to unit cell volume for non-right angles
-* Make fill inital plume and background matrix a function
+* Add correction to unit cell volume for non-right angles
 * Implement folder selection into initialVelocityDistribution save feature
 * Get correct formation energy of cubic spinel Li4Ti5O12 target
-* Get materials data straight from PeriodicTable and MaterialsProject
-    websites
+* Get materials data straight from P-Table and MaterialsProject websites
 * Atomatically determine non-ionized oxidation states in plasma plume
 
 # To validate
 * Species that form in plasma plume
 * Angular fitting parameter
 * Initial particle velocity distribution width
-* Restriction values
 * Ablation depth in target
 * Absorption coefficient (Temp and photon energy dependend)
 * Activation energies
@@ -190,8 +189,3 @@ Follow MATLAB style guidelines v1.3
 
 # Questions
 * Why does the first angle bin not have the largest number of particles?
-* Why are all the array's in the Makestruct function doubled?
-    Example: V = [0 20000 40000 0 20000 40000]
-* Why are O2 and Ti2O3 not included in mass array?
-* Why is only the activation energy of TiO listed, and not of SrO or
-  O2?
