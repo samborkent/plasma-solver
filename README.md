@@ -39,17 +39,21 @@ Follow MATLAB style guidelines v1.3
 * velo    : Velocity
 * uc      : Unit cell
 
+# Ideas
+* Make radial bin loop variable based on the time and velocity
+
 # Issues
-* The number of plasma particles is not conserved. Negative number of plasma
-    particles is possible.
+* Negative number of background particles occurs in first time step.
+* Negative collision probability occurs.
+* Updating of matrices should happen after calculating collision
+    probability.
 * When making crazy composite targets, lithium gains too much energy.
 
 # Change log
 
 20-03-21:
-* Added condition that the number of collided particles is limited by the
-    the species with lowest number of particles in that bin to avoid
-    negative collision probabilities.
+* The velocities of all particles in the last radial bin gets set to zero.
+* Fixed updating of matrices.
 
 18-03-21:
 * Implemented first working version of collision with one species and

@@ -21,11 +21,11 @@ for iRadius = 1 : nRadius
                                 * ( cosd(angle(iAngle))     ...
                                 -   cosd(angle(iAngle + 1)) );
     end
-
-    % Insert number of background particles per radial bin into
-    %   first velocity bin (v = 0)
-    bgMatrix(1, iRadius) = bgDensity * binVolume(iRadius);
 end
+
+% Insert number of background particles per radial bin into
+%   first velocity bin (v = 0)
+bgMatrix(1, :) = bgDensity .* binVolume;
 
 end
 
