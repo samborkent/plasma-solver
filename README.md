@@ -51,6 +51,15 @@ Follow MATLAB style guidelines v1.3
 
 # Change log
 
+25-03-21:
+* Placed the particle update after the collision calculation. Still need to
+    have the distance traveled be different for collided particles and to
+    include collisions in the starting bin.
+* Tried to implement number of collisions, started a new main file.
+    (previous code in testPlasmaSolver, even older code in
+    testPlasmaSolverOld) Added another dimension to the matrix to count
+    collisions. It's (kind of) working, but does not give expected results.
+
 20-03-21:
 * The velocities of all particles in the last radial bin gets set to zero.
 * Fixed updating of matrices.
