@@ -51,6 +51,15 @@ Follow MATLAB style guidelines v1.3
 
 # Change log
 
+26-03-21:
+* Made a second pass per time step to update background particle positions,
+    to ensure all particles get updated.
+* Tried to fix collisions. It's still not working as planned. All bg
+    particles close to target get scattered due to the high initial plasma
+    particle density, creating a vacuum near the target.
+* Worked on number of collision system, number of collisions does not
+    update properly.
+
 25-03-21:
 * Placed the particle update after the collision calculation. Still need to
     have the distance traveled be different for collided particles and to
