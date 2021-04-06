@@ -127,8 +127,8 @@ laserFluence    = 2.0;
 %   * Small for ceramic targets.
 %   * Can be approximated by measuring the temperature increase of the
 %       target after a fixed number of laser pulses, then use the specific
-%       heat equation to calculate total heat dissipation, and divide by
-%       the number of pulses.
+%       heat equation to calculate total heat dissipation, divide by the
+%       number of pulses.
 %   Default: 0
 heatTarget      = 0;
 
@@ -143,8 +143,8 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Temporal limits
 timeMin     = 0;        % Start time [s]
-timeMax     = 6E-6;     % End time [s]
-timeDelta   = 1E-7;     % Time step duration [s]
+timeMax     = 12E-6;     % End time [s]
+timeDelta   = 5E-7;     % Time step duration [s]
 
 % Radial limits
 radiusMin   = 0;        % Start position [m]
@@ -153,7 +153,7 @@ radiusDelta = 5E-5;     % Radial step size [m]
 
 % Velocity limits
 veloMax         = 2.5E4; % Maximal initial velocity
-veloStepsize    = 5;     % Velocity step size
+veloStepsize    = 1;     % Velocity step size
 
 %% Calculations
 % Everything below is calculated automatically based on user input above.
@@ -482,7 +482,7 @@ for iTime = 1 : nTime
                 + plasmaMatrix(iNewVelo, iRadius + nRadiusDelta);
 
             % Increase number of collisions of bin by normalized collision
-            %   rate times
+            %   rate
             plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) =  ...
                 plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) ...
                 + (colRateBin * normK);
@@ -555,6 +555,7 @@ for iTime = 1 : nTime
     %----------------------------------------------------------------------
     % Second pass to update background positions
     %----------------------------------------------------------------------
+    % Should be unnecessary -> Include in main loop
     
     for iRadius = (nRadius - 1) : -1 : 1
     for iVelo = nVelo : -1 : iFirstVelo
@@ -597,20 +598,23 @@ for iTime = 1 : nTime
             loopCount = loopCount + 1;
         end
         
-    end
-    end
+    end % Background velocity loop
+    end % Background radial loop
 
     %% Plot 1D propagation
     % Only for first angle (center of the plume)
     if iAngle == 1
         % Only for specific times
         if (time(iTime) == 0.5E-6) || (time(iTime) == 1E-6) || ...
-           (time(iTime) == 1.5E-6) || (round(time(iTime)*10^9) == 3000)
+           (time(iTime) == 1.5E-6) || (round(time(iTime)*10^9) == 3000) || ...
+           (time(iTime) == timeMax - timeDelta)
 
             % Calculate total number of particles per radial bin
             nPlasmaRadius = nPlasmaParticlesPerRadius( radius, plasmaMatrix );
             nBGRadius = nPlasmaParticlesPerRadius( radius, bgMatrix );
 
+            plasmaFit = fit(radius, nPlasmaRadius, 'poly1');
+            
             % Normalization factor
             plasmaNorm = startPlasma / sum(nPlasmaRadius);
             bgNorm = startBG / sum(nBGRadius);
@@ -621,14 +625,12 @@ for iTime = 1 : nTime
 
             % Plot the 1D propagation
             figure(figPropagation1D);
-            bar( radius, nPlasmaRadius, ...
-                 'DisplayName', [num2str(time(iTime), 3) ' s'], ...
-                 'LineStyle', 'none' );
+            plot( plasmaFit, radius, nPlasmaRadius, ...
+                 'DisplayName', [num2str(time(iTime), 3) ' s'] );
              
             figure(figBGPropagation1D);
-            bar( radius, nBGRadius ./ binVolume, ...
-                 'DisplayName', [num2str(time(iTime), 3) ' s'], ...
-                 'LineStyle', 'none' );
+            plot( radius, nBGRadius ./ binVolume, ...
+                 'DisplayName', [num2str(time(iTime), 3) ' s'] );
         end
     end 
 
@@ -646,7 +648,7 @@ endBG = sum(sum(bgMatrix));
 if abs(startPlasma - endPlasma) < nMin
     disp('Total number of plasma particles was conserved.');
 else
-    disp(['Change in number of plasma particles: ' ...
+    disp(['Change in number of plasma particles detected: ' ...
             num2str(startPlasma - endPlasma, '%.3E')]);
 %     error('Total number of plasma particles was NOT conserved.');
 end
@@ -659,11 +661,23 @@ else
             num2str(startBG - endBG, '%.3E')]);
 %     error('Total number of background particles was NOT conserved.');
 end
+
+% Temporary matrix holding number of particles
+plasmaTemp = plasmaMatrix(:, :, nField);
+
+% Total number of negative particles
+nNeg = abs(sum(plasmaTemp(plasmaTemp < 0)));
+
+% Check if there is a significant number of negative particles
+if nNeg > nMin
+    disp(['Significant number of negative plasma particles detected: ' ...
+            num2str(nNeg, '%.3E')]);
+end
     
 %% Plot settings
 
 % 1D propagation
-figPropagation1D;
+figure(figPropagation1D);
 legend;
 xlim([0 0.05]);
 % ylim([0 0.5E14]);
@@ -671,7 +685,7 @@ title('1D propagation of Ti from TiO_2 target');
 xlabel('Target distance [m]');
 ylabel('Number of particles');
 
-figBGPropagation1D;
+figure(figBGPropagation1D);
 legend;
 xlim([0 0.05]);
 % ylim([0 0.5E14]);
@@ -681,33 +695,22 @@ ylabel('Particle density [m^-^3]');
 
 %% TEST
 
-% colMatrix = round( plasmaMatrix(:, :, kField) );
-% 
-% plotMatrix = plasmaMatrix(:, :, nField);
-% 
-% maxNCol = max(max(colMatrix));
-% 
-% tempRad = zeros(1, nRadius);
-% 
-% fig = figure;
-% hold on;
-% ylim([0 1E13]);
-% 
-% for iNCol = 0 : 2  
-%     for iRadius = 1 : nRadius
-%         tempMatrix = plotMatrix(colMatrix(:,iRadius) == iNCol, iRadius);
-%         
-%         tempRad(iRadius) = sum(tempMatrix);
-%     end
-%     
-%     [pks, locs] = findpeaks(tempRad, ...
-%                             'Threshold', 1E12);
-%     
-% %     tempRad = smooth(tempRad, 2);
-%     
-% %     [tempRad, ~] = envelope(pks);
-%     
-% %     tempRad = smooth(tempRad, 5);
-%     
-%     plot(locs, pks);
-% end
+colMatrix = round( plasmaMatrix(:, :, kField) );
+
+tempRad = zeros(1, nRadius);
+
+fig = figure;
+hold on;
+ylim([0 2E12]);
+
+for iNCol = 0 : 3
+    for iRadius = 1 : nRadius
+        tempMatrix = plasmaTemp(colMatrix(:, iRadius) == iNCol, iRadius);
+
+        tempRad(iRadius) = sum(tempMatrix);
+    end
+    
+    plot(radius, tempRad);
+end
+
+legend('Uncollided', '1 collision', '2 collisions', '3 collisions');

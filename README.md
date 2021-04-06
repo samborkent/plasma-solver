@@ -10,22 +10,24 @@ T. Wijnands, E.P. Houwman, G. Koster, G. Rijnders, and M. Huijben.
 The original script by Tom Wijnands modeled the propagation of an PLD
 plasma plume in 3D as result of ablation of a single crystal TiO2 target,
 initial ablation is not included. Rewritten and extended by Sam Borkent
-to improve readability and performance and to support targets of any
-composition.
+to improve usability and performance and to support targets of any
+composition, also targets containing elements with lower mass than the
+background species.
 
 # Assumptions
-* The excitation energy of the atoms in the unit cell are neglected.
-* The background gas starts out with zero velocity, as the room temperature
+* The excitation energy of the atoms in the unit cell induced by the
+	ablation laser are neglected.
+* The background gas starts out with zero velocity: the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plasma
-    particle velocities. The particles in the background gas do not have a
-    preferential direction, so their net velocity is zero.
-* Only head-on collisions are included, there is no net exchange of
-    particles between angular bins.
+    particle velocities (~10^4 m/s). The particles in the background gas do
+    not have a preferential direction, so their net velocity is zero.
+* All collisions are head-on: collisions at random angles in all directions
+    cancel out.
+* There is no net exchange of particles between angular bins: the number of
+    particles entering and leaving a angular bin each time step is similar.
 * Particles can only gain positive momentum. When a light particle collides
     with a heavier particle, its momentum is set to zero, and the heavy
     particle gains a little momentum, so momentum is not conserved.
-* Collisions are only possible if the background particles move slower than
-    the plume particles
 * Collisions of species with the same mass are neglected, as for
     completely elastic collisions they would interchange velocities,
     resulting in no net change of density.
@@ -39,17 +41,75 @@ Follow MATLAB style guidelines v1.3
 * velo    : Velocity
 * uc      : Unit cell
 
-# Ideas
-* Make radial bin loop variable based on the time and velocity
-
 # Issues
-* Negative number of background particles occurs in first time step.
-* Negative collision probability occurs.
-* Updating of matrices should happen after calculating collision
-    probability.
-* When making crazy composite targets, lithium gains too much energy.
+* All background particles in the first few bins get scattered due to a
+    much higher density of plasma particles (10^15) in the first radial bin
+    compared to 10^12 background particles. So even with a collision rate
+    of 0.001, all background particles get scattered, resulting in a
+    vacuum. The number of particles seems to be conserved, even though
+    the area under the density curve seems unconserved.
+* When making complex composite targets, lithium gains too much energy.
+* Cannot reproduce Tom's results.
+
+# Questions
+* Why does the first angle bin not have the largest number of particles?
+
+# To Do
+
+Main functionality
+* Implement proper smoothing/fitting of data
+* Verify results with one heavy metal collision
+* Counting the number of collisions per bin
+* Reproduce the Ti 1D propagation plot of the paper
+* 2D density plot
+* Collisions for two species
+* Collisions for light metals (Li)
+* Collisions for any number of species with any mass
+* Oxidation of plasma species
+* Collisions between unoxidized and oxidized species
+
+Physical improvements
+* Implement excitation energy in initialVelocityDistribution
+* Calculate heat dissipation into target
+* Include a temperature gradient origination from the heated substrate,
+    resulting in a lower density and higher kinetic energy of background
+    species near the substrate.
+
+Additional features
+* Add correction to unit cell volume for non-right angles
+* Implement folder selection into initialVelocityDistribution save feature
+* Get materials data straight from P-Table and MaterialsProject websites
+* Atomatically determine non-ionized oxidation states in plasma plume
+
+Clean-up
+* initialVelocityDistribution
+* Rename nPlasmaParticlesPerRadius to nParticlesPerRadius
+* Include plotting of 1D propagation in nParticlesPerRadius function
+
+Performance
+* Replace all arrays with values in range 10^(+-38) with single-precision
+* Replace find with logical indexing where possible
+* Replace division with multiplication where possible
+* Include second pass to update background particles in the main loop
+
+Validation
+* Which species form in plasma
+* Angular fitting parameter
+* Initial particle velocity distribution width
+* Ablation depth in target
+* Absorption coefficient (Temp and photon energy dependend)
+* Activation energies
+* Oxidation energies
+* Which data to print in config file
+* Formation energy of cubic spinel Li4Ti5O12 target
 
 # Change log
+
+06-04-21:
+* Cleaned up readme
+* Worked on number of collisions per bin. It's working, but results are
+    wrong.
+* Tried to implement smoothing/fitting.
 
 26-03-21:
 * Made a second pass per time step to update background particle positions,
@@ -186,28 +246,3 @@ Follow MATLAB style guidelines v1.3
   variables/Parameter/CONSTANTS
 * Made make dir conditional so it is skipped if dir already exists
 * Add date and time to config file
-
-# To do
-* Replace find with logical indexing in the
-* Include plotting of 1D propagation in nPlasmaParticlesPerRadius function
-* Clean up initialVelocityDistribution code
-* Replace divisions that are performed often with multiplications
-* Implement excitation energy
-* Add correction to unit cell volume for non-right angles
-* Implement folder selection into initialVelocityDistribution save feature
-* Get correct formation energy of cubic spinel Li4Ti5O12 target
-* Get materials data straight from P-Table and MaterialsProject websites
-* Atomatically determine non-ionized oxidation states in plasma plume
-
-# To validate
-* Species that form in plasma plume
-* Angular fitting parameter
-* Initial particle velocity distribution width
-* Ablation depth in target
-* Absorption coefficient (Temp and photon energy dependend)
-* Activation energies
-* Oxidation energies
-* Which data to print in config file
-
-# Questions
-* Why does the first angle bin not have the largest number of particles?
