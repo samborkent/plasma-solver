@@ -8,15 +8,14 @@ during pulsed laser deposition of complex oxide thin films', 2020, by
 T. Wijnands, E.P. Houwman, G. Koster, G. Rijnders, and M. Huijben.
 
 The original script by Tom Wijnands modeled the propagation of an PLD
-plasma plume in 3D as result of ablation of a single crystal TiO2 target,
+plasma plume in 2D as result of ablation of a single crystal TiO2 target,
 initial ablation is not included. Rewritten and extended by Sam Borkent
 to improve usability and performance and to support targets of any
-composition, also targets containing elements with lower mass than the
-background species.
+composition consisting of species of any mass.
 
 # Assumptions
 * The excitation energy of the atoms in the unit cell induced by the
-	ablation laser are neglected.
+	ablation laser is neglected.
 * The background gas starts out with zero velocity: the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plasma
     particle velocities (~10^4 m/s). The particles in the background gas do
@@ -24,7 +23,8 @@ background species.
 * All collisions are head-on: collisions at random angles in all directions
     cancel out.
 * There is no net exchange of particles between angular bins: the number of
-    particles entering and leaving a angular bin each time step is similar.
+    particles entering and leaving each angular bin each time step is
+    similar.
 * Particles can only gain positive momentum. When a light particle collides
     with a heavier particle, its momentum is set to zero, and the heavy
     particle gains a little momentum, so momentum is not conserved.
@@ -44,12 +44,14 @@ Follow MATLAB style guidelines v1.3
 # Issues
 * All background particles in the first few bins get scattered due to a
     much higher density of plasma particles (10^15) in the first radial bin
-    compared to 10^12 background particles. So even with a collision rate
-    of 0.001, all background particles get scattered, resulting in a
-    vacuum. The number of particles seems to be conserved, even though
-    the area under the density curve seems unconserved.
+    compared to background particle density (10^12). So, even with a
+    low collision rate (e.g. 0.001), all background particles get scattered,
+    resulting in vacuum formation in front of the target. The number of
+    particles seems to be conserved, even though the area under the density
+    curve of the propagating background gas is not conserved.
 * When making complex composite targets, lithium gains too much energy.
-* Cannot reproduce Tom's results.
+* Cannot reproduce Tom's results: particles travel faster right after
+    after ablation but propagate slower.
 
 # Questions
 * Why does the first angle bin not have the largest number of particles?
