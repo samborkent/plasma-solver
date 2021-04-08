@@ -31,6 +31,8 @@ composition consisting of species of any mass.
 * Collisions of species with the same mass are neglected, as for
     completely elastic collisions they would interchange velocities,
     resulting in no net change of density.
+* Particles are assumed static if there velocity is lower than the velocity
+    required to travel one radial bin in one time step.
 
 # Naming conventions
 Follow MATLAB style guidelines v1.3
@@ -82,17 +84,21 @@ Additional features
 * Implement folder selection into initialVelocityDistribution save feature
 * Get materials data straight from P-Table and MaterialsProject websites
 * Atomatically determine non-ionized oxidation states in plasma plume
+* Adjust maximum velocity automatically based on the mean initial velocity
+    of the lowest mass species in the target
 
 Clean-up
 * initialVelocityDistribution
 * Rename nPlasmaParticlesPerRadius to nParticlesPerRadius
 * Include plotting of 1D propagation in nParticlesPerRadius function
+* Make the plotting the separated collision propagation a function
 
 Performance
 * Replace all arrays with values in range 10^(+-38) with single-precision
 * Replace find with logical indexing where possible
 * Replace division with multiplication where possible
 * Include second pass to update background particles in the main loop
+* Smart skip the last few traveled bins if they exceed nRadius
 
 Validation
 * Which species form in plasma
@@ -106,6 +112,9 @@ Validation
 * Formation energy of cubic spinel Li4Ti5O12 target
 
 # Change log
+
+08-04-21:
+* Tried to closely reproduce Tom's code, still no luck...
 
 06-04-21:
 * Cleaned up readme
