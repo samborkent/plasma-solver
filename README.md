@@ -113,6 +113,12 @@ Validation
 
 # Change log
 
+13-04-21:
+* Started yet again a new script: realSolver
+* Wrote fitGaussian and updateMatrix functions
+* Collisions are working, but the background gets a negative amount of
+    particles
+
 08-04-21:
 * Tried to closely reproduce Tom's code, still no luck...
 

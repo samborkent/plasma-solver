@@ -524,31 +524,31 @@ for iTime = 1 : nTime
             % Update background particle velocities
             %--------------------------------------------------------------
 
-%             % Remove collided bg particles from velo bin
-%             bgMatrix(iBGVelo, thisRadius) = -nColBin ...
-%                 + bgMatrix(iBGVelo, thisRadius);
-% 
-%             % Add collided bg particles to new velo bin
-%             bgMatrix(iNewBGVelo, thisRadius) = nColBin ...
-%                 + bgMatrix(iNewBGVelo, thisRadius);
+            % Remove collided bg particles from velo bin
+            bgMatrix(iBGVelo, thisRadius) = -nColBin ...
+                + bgMatrix(iBGVelo, thisRadius);
+
+            % Add collided bg particles to new velo bin
+            bgMatrix(iNewBGVelo, thisRadius) = nColBin ...
+                + bgMatrix(iNewBGVelo, thisRadius);
 
             %--------------------------------------------------------------
             % Update plasma particle velocities and position
             %--------------------------------------------------------------
 
-%             % Remove collided plasma particles from the old bin
-%             plasmaMatrix(iVelo, iRadius) = -nColBin ...
-%                 + plasmaMatrix(iVelo, iRadius);
-% 
-%             % Add collided plasma particles to the new bin
-%             plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) = nColBin ...
-%                 + plasmaMatrix(iNewVelo, iRadius + nRadiusDelta);
-% 
-%             % Increase number of collisions of bin by normalized collision
-%             %   rate
-%             plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) =  ...
-%                 plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) ...
-%                 + (colRateBin * normK);
+            % Remove collided plasma particles from the old bin
+            plasmaMatrix(iVelo, iRadius) = -nColBin ...
+                + plasmaMatrix(iVelo, iRadius);
+
+            % Add collided plasma particles to the new bin
+            plasmaMatrix(iNewVelo, iRadius + nRadiusDelta) = nColBin ...
+                + plasmaMatrix(iNewVelo, iRadius + nRadiusDelta);
+
+            % Increase number of collisions of bin by normalized collision
+            %   rate
+            plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) =  ...
+                plasmaMatrix(iNewVelo, iRadius + nRadiusDelta, kField) ...
+                + 1;
 
             if debugBool
                 % [DEBUG] Total loop counter
@@ -572,11 +572,11 @@ for iTime = 1 : nTime
         continue
     end
     
-%     % Prevent negative number of particles
-%     %   * Should not happen, built in for redundancy
-%     if nPlasma < 0
-%         nPlasma = 0;
-%     end
+    % Prevent negative number of particles
+    %   * Should not happen, built in for redundancy
+    if nPlasma < 0
+        nPlasma = 0;
+    end
 
     % Remove all plasma particles from current bin
     plasmaMatrix(iVelo, iRadius) = -nPlasma ...
@@ -590,33 +590,35 @@ for iTime = 1 : nTime
 
     end % Radial loop
 
-%     %----------------------------------------------------------------------
-%     % Freeze particles in last radial bin
-%     %----------------------------------------------------------------------
-% 
-%     % Get all kinetic plasma particles in the last radial bin
-%     plasmaEnd = sum( plasmaMatrix(2:end, nRadius) );
-% 
-%     % If the number of kinetic pasma particles is above the threshold
-%     if plasmaEnd >= nMin
-%         % Remove plasma particles from the kinetic velocity bins
-%         plasmaMatrix(2:end, nRadius) = 0;
-% 
-%         % Add plasma particles to the static velocity bin
-%         plasmaMatrix(1, nRadius) = plasmaMatrix(1, nRadius) + plasmaEnd;
-%     end
-% 
-%     % Get all kinetic background particles in the last radial bin
-%     bgEnd = sum( bgMatrix(2:end, nRadius) );
-% 
-%     % If the number of kinetic bg particles is above the threshold
-%     if bgEnd >= nMin
-%         % Remove bg particles from the kinetic velocity bins
-%         bgMatrix(2:end, nRadius) = 0;
-% 
-%         % Add bg particles to the static velocity bin
-%         bgMatrix(1, nRadius) = bgMatrix(1, nRadius) + bgEnd;
-%     end
+    %----------------------------------------------------------------------
+    % Freeze particles in last radial bin
+    %----------------------------------------------------------------------
+
+    % Get all kinetic plasma particles in the last radial bin
+    plasmaEnd = sum( plasmaMatrix(2:end, nRadius) );
+
+    % If the number of kinetic pasma particles is above the threshold
+    if plasmaEnd >= nMin
+        % Remove plasma particles from the kinetic velocity bins
+        plasmaMatrix(2:end, nRadius) = 0;
+
+        % Add plasma particles to the static velocity bin
+        plasmaMatrix(1, nRadius) = plasmaMatrix(1, nRadius) + plasmaEnd;
+    end
+
+    % Get all kinetic background particles in the last radial bin
+    bgEnd = sum( bgMatrix(2:end, nRadius) );
+
+    % If the number of kinetic bg particles is above the threshold
+    if bgEnd >= nMin
+        % Remove bg particles from the kinetic velocity bins
+        bgMatrix(2:end, nRadius) = 0;
+
+        % Add bg particles to the static velocity bin
+        bgMatrix(1, nRadius) = bgMatrix(1, nRadius) + bgEnd;
+    end
+    
+    
 
     %% Plot 1D propagation
     % Only for first angle (center of the plume)

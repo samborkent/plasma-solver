@@ -597,7 +597,7 @@ for rad = Rad_start+Rad_delta %: Rad_delta : Rad_stop
                             %
                             % Colliding particles with a standing background
                             %
-                            --------------------------------------------------------------------------
+                            %--------------------------------------------------------------------------
                             % Xbg_n_minb    %current position
                             % X_n_b_st      % new location plasma
                             % Xbg_n_b_st    % new location backgound
