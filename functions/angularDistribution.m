@@ -5,7 +5,7 @@ function nParticleAngle = angularDistribution( angle, radiusDelta, ...
 nAngle = numel(angle);
 
 % Pre-allocate memory
-nParticleAngle = zeros(1, nAngle - 1);
+nParticleAngle = zeros(1, nAngle);
 
 % Compute initial angular plasma particle distribution (eq. 5)
 for iAngle = 1 : (nAngle - 1)

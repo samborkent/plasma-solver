@@ -89,7 +89,6 @@ Additional features
 
 Clean-up
 * initialVelocityDistribution
-* Rename nPlasmaParticlesPerRadius to nParticlesPerRadius
 * Include plotting of 1D propagation in nParticlesPerRadius function
 * Make the plotting the separated collision propagation a function
 
@@ -97,8 +96,6 @@ Performance
 * Replace all arrays with values in range 10^(+-38) with single-precision
 * Replace find with logical indexing where possible
 * Replace division with multiplication where possible
-* Include second pass to update background particles in the main loop
-* Smart skip the last few traveled bins if they exceed nRadius
 
 Validation
 * Which species form in plasma
@@ -112,6 +109,19 @@ Validation
 * Formation energy of cubic spinel Li4Ti5O12 target
 
 # Change log
+
+15-04-21:
+* It works! 
+* Added back velocity weights for collision probability, fixed mistake
+    were I used indices to calculate the weights instead of the velocity
+    itself.
+* Fixed that the traveled distance of a collided particle was
+    calculated with the index instead of the velocity itself.
+* Fixed that the collided background particles were added to the plasma
+    particle initial position plus the traveled distance, instead
+    of to the collision site plus the traveled distance.
+* Fixed not substracting the already collided particles when counting the
+    number of background particles available for collision in a bin.
 
 13-04-21:
 * Started yet again a new script: realSolver
