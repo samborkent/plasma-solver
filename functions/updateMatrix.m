@@ -2,8 +2,11 @@ function updatedMatrix = updateMatrix( particleMatrix, nRadius, nVelo, ...
                                        iFirstVelo, nMin, nRadiusTraveled )
 %UPDATEMATRIX Update non-colliding particle matrix
 
+% Get rid of dimensions of size 1
+squeezeMatrix = squeeze(particleMatrix);
+
 % Pre-allocate updated matrix
-updatedMatrix = particleMatrix.*0;
+updatedMatrix = squeezeMatrix.*0;
 
 for iRadius = (nRadius - 1) : -1 : 1
 %% Calculations per radial bin
@@ -21,7 +24,12 @@ for iVelo = nVelo : -1 : iFirstVelo
 %--------------------------------------------------------------------------
 
 % Number of plasma particles in current bin
-nParticle = particleMatrix(iVelo, iRadius);
+nParticle = squeezeMatrix(iVelo, iRadius);
+
+% [DEBUG]
+if nParticle < -nMin
+    disp([ 'Negative number of particles: ' num2str(nParticle, '%.2E') ]);
+end
 
 % Skip iteration if the number of particles is below the threshold
 if nParticle < nMin
@@ -57,7 +65,7 @@ end % Velocity loop
 end % Radius loop
 
 % Update matrix
-updatedMatrix = particleMatrix + updatedMatrix;
+updatedMatrix = squeezeMatrix + updatedMatrix;
 
 end
 

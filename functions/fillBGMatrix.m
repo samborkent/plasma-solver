@@ -1,11 +1,9 @@
-function [bgMatrix, binVolume] = fillBGMatrix( bgDensity, nVelo, radius, angle, iAngle, radiusDelta )
+function [bgMatrix, binVolume] = fillBGMatrix( bgDensity, radius, angle, iAngle, radiusDelta )
 %FILLBGMATRIX Fill background matrix with particles
 
 nRadius = numel(radius);
 
 binVolume = zeros(1, nRadius);
-
-bgMatrix = zeros(nVelo, nRadius);
 
 for iRadius = 1 : nRadius
     % Calculate bin volumes [m^3]
@@ -26,7 +24,7 @@ end
 
 % Insert number of background particles per radial bin into
 %   first velocity bin (v = 0)
-bgMatrix(1, :) = bgDensity .* binVolume;
+bgMatrix = bgDensity .* binVolume;
 
 end
 

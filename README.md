@@ -16,6 +16,8 @@ composition consisting of species of any mass.
 # Assumptions
 * The excitation energy of the atoms in the unit cell induced by the
 	ablation laser is neglected.
+* The laser spot is assumed to be square, resulting in a cilcular plasma
+    cross-section.
 * The background gas starts out with zero velocity: the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plasma
     particle velocities (~10^4 m/s). The particles in the background gas do
@@ -31,8 +33,14 @@ composition consisting of species of any mass.
 * Collisions of species with the same mass are neglected, as for
     completely elastic collisions they would interchange velocities,
     resulting in no net change of density.
-* Particles are assumed static if there velocity is lower than the velocity
+* Particles are assumed static if their velocity is lower than the velocity
     required to travel one radial bin in one time step.
+* Oxidation only happens with the background gas, not with plasma
+    particles. In non-oxygen background gasses the material gets oxidized
+    at the substrate surface solely from oxygen originating from the
+    target.
+* A sole particle can only undergo one collision per time step. (valid for
+    sufficient resolution)
 
 # Naming conventions
 Follow MATLAB style guidelines v1.3
@@ -44,25 +52,15 @@ Follow MATLAB style guidelines v1.3
 * uc      : Unit cell
 
 # Issues
-* All background particles in the first few bins get scattered due to a
-    much higher density of plasma particles (10^15) in the first radial bin
-    compared to background particle density (10^12). So, even with a
-    low collision rate (e.g. 0.001), all background particles get scattered,
-    resulting in vacuum formation in front of the target. The number of
-    particles seems to be conserved, even though the area under the density
-    curve of the propagating background gas is not conserved.
 * When making complex composite targets, lithium gains too much energy.
-* Cannot reproduce Tom's results: particles travel faster right after
-    after ablation but propagate slower.
 
 # Questions
-* Why does the first angle bin not have the largest number of particles?
+* Why does Ti oxidize into TiO and not immediately into TiO2 when colliding
+    with O2?
 
 # To Do
 
 Main functionality
-* Implement proper smoothing/fitting of data
-* Verify results with one heavy metal collision
 * Counting the number of collisions per bin
 * Reproduce the Ti 1D propagation plot of the paper
 * 2D density plot
@@ -78,6 +76,8 @@ Physical improvements
 * Include a temperature gradient origination from the heated substrate,
     resulting in a lower density and higher kinetic energy of background
     species near the substrate.
+* Improve the initial plasma particle distribution, so the middle of the
+    plume has the most particles.
 
 Additional features
 * Add correction to unit cell volume for non-right angles
@@ -86,11 +86,13 @@ Additional features
 * Atomatically determine non-ionized oxidation states in plasma plume
 * Adjust maximum velocity automatically based on the mean initial velocity
     of the lowest mass species in the target
+* Add interpolation into velocity distribution for quick runs
 
 Clean-up
 * initialVelocityDistribution
 * Include plotting of 1D propagation in nParticlesPerRadius function
 * Make the plotting the separated collision propagation a function
+* Make calculate new velocity a function
 
 Performance
 * Replace all arrays with values in range 10^(+-38) with single-precision
@@ -108,7 +110,20 @@ Validation
 * Which data to print in config file
 * Formation energy of cubic spinel Li4Ti5O12 target
 
+# Differences with Wijnands's model
+* No smoothing between velocity bins each time step.
+* Background gas can have every velocity and can be completely modeled just
+    like plasma species.
+* Using double matrices for all data instead of struct, which improves
+    performance significantly.
+* The code was written to be general purpose, so should eventually work for
+    most materials, instead of specifically for TiO2.
+* Adjusted collision rate calculation, and included a velocity weight term.
+
 # Change log
+
+20-04-21:
+* Tried to include O propagation and oxidation.
 
 15-04-21:
 * It works! 
