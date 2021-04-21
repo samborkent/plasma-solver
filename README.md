@@ -122,6 +122,11 @@ Validation
 
 # Change log
 
+21-04-21:
+* Increased performance of updateMatrix.
+* Tried to implement O propagation, it works, but the performance is way too
+    slow.
+
 20-04-21:
 * Tried to include O propagation and oxidation.
 
