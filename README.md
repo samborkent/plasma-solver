@@ -14,7 +14,7 @@ composition consisting of species of any mass.
 # Assumptions
 * The excitation energy of the atoms in the unit cell induced by the
 	ablation laser is neglected.
-* The laser spot is assumed to be square, resulting in a cilcular plasma
+* The laser spot is assumed to be square, resulting in a circular plasma
     cross-section.
 * The background gas starts out with zero velocity: the room temperature
     velocity is aroung 400 m/s, which is two orders smaller than the plasma
@@ -51,10 +51,6 @@ Follow MATLAB style guidelines v1.3
 
 # Issues
 * When making complex composite targets, lithium gains too much energy.
-
-# Questions
-* Why does Ti oxidize into TiO and not immediately into TiO2 when colliding
-    with O2?
 
 # To Do
 
