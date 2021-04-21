@@ -1,7 +1,5 @@
-# Plasma Solver v5.0.0
-Author: Tom Wijnands
-
-Rewritten and modified for targets of any composition: Sam Borkent
+# Plasma Solver
+Author: Tom Wijnands, Sam Borkent
 
 Based on 'Numerical modelling of the plasma plume propagation and oxidation
 during pulsed laser deposition of complex oxide thin films', 2020, by
