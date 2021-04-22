@@ -122,6 +122,9 @@ Validation
 
 # Change log
 
+22-04-21:
+* Implemented number of collision separation
+
 21-04-21:
 * Increased performance of updateMatrix.
 * Tried to implement O propagation, it works, but the performance is way too
