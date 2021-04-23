@@ -16,6 +16,8 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+tic;
+
 %% Initialization
 % Do not change!
 
@@ -81,9 +83,20 @@ commentString = [ ' ' ...
 %--------------------------------------------------------------------------
 
 % Minimal number of particles per bin
-nMin = 1;
+nMin = 1E5;
 
+% Maximum number of collisions
 kMax = 3;
+
+% Switch velocity smoothing for non -collided particles on or off (true / false)
+%   * Circumvents quantization error, impacts performance greatly
+%   * Conserves number of particles
+veloSmoothingBool = true;
+
+% Width of the Gaussian smoothing function for smoothing the non-collided
+%   particle verlocities
+%   * 3 corresponds roughly due to 400 m/s
+smoothWidth = 3;
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -339,10 +352,10 @@ hold on;
 %% Main program
 
 % Temporary values for testing
-sigma   = pi * ( 2*PT.O.RADIUS + PT.Ti.RADIUS )^2;
-% sigma   = pi * ( 2*PT.O.RADIUS + PT.O.RADIUS )^2;
-mass    = PT.Ti.MASS;
-% mass    = PT.O.MASS;
+% sigma   = pi * ( 2*PT.O.RADIUS + PT.Ti.RADIUS )^2;
+sigma   = pi * ( 2*PT.O.RADIUS + PT.O.RADIUS )^2;
+% mass    = PT.Ti.MASS;
+mass    = PT.O.MASS;
 massBG  = 2*PT.O.MASS;
 
 index = 0;
@@ -391,8 +404,8 @@ if iAngle > 1
 end
                                            
 % Fill into the plasma matrix
-plasmaMatrix(:, 1) = nParticleVeloInit(:, 1);
-colMatrix(1, :, 1) = nParticleVeloInit(:, 1);
+plasmaMatrix(:, 1) = nParticleVeloInit(:, 2);
+colMatrix(1, :, 1) = nParticleVeloInit(:, 2);
 
 for iTime = 1 : nTime
 %% Calculations per time step
@@ -634,6 +647,40 @@ bgMatrix = bgMatrix + bgAdd;
 colMatrix = colMatrix + colAdd;
 
 %--------------------------------------------------------------------------
+% Velocity smoothing
+%--------------------------------------------------------------------------
+
+% If velocity smoothing is enabled
+if veloSmoothingBool
+    % Loop through number of collisions
+    for k = 1 : kMax
+        % Get matrix per number of collisions
+        kMatrix = squeeze( colMatrix(k, :, :) );
+
+        % Sum all elements in number of collision matrix
+        kMatrixSum = sum( kMatrix, 'all' );
+
+        % If the number of collision matrix is filled
+        if kMatrixSum >= nMin
+            % Set all bins with number of particles below threshold to zero
+            kMatrix(kMatrix < nMin) = 0;
+
+            % For the non-collided particles
+            if k == 1
+                kMatrix = smoothdata( kMatrix, 1, 'gaussian', smoothWidth );
+            end
+
+            % Normalize and multiply by original number of particles before
+            %   emptying bins below threshold
+            kMatrix = kMatrix .* ( kMatrixSum / sum(kMatrix, 'all') );
+
+            % Insert into full matrix
+            colMatrix(k, :, :) = kMatrix;
+        end
+    end
+end
+
+%--------------------------------------------------------------------------
 % Plot 1D propagation
 %--------------------------------------------------------------------------
 
@@ -646,28 +693,35 @@ if iAngle == 1
 %        (iTime == 51)  || (iTime ==  61) || (iTime == 91) || (iTime == 121) || ...
 %        (iTime == 151) || (iTime == 181)
 
+        % Increment subplot index
         index = index + 1;
 
+        % Initialize sum of all collisions array
+        nPlasmaRadiusSum = zeros(1, nRadius);
+        
         for k = 1 : kMax
+            % Calculate number of particles with this number of collisions
+            %   per radial bin
             nPlasmaRadius = nParticlesPerRadius( radius, colMatrix(k, :, :) );
             
-            % Total number of particles for this number of collisions
-            nPlasmaPerK = sum( colMatrix(k, :, :), 'all' );
+            if ~veloSmoothingBool
+                if k == 1
+                    % Total number of particles for this number of collisions
+                    nPlasmaPerK = sum( colMatrix(k, :, :), 'all' );
+
+                    % Fit a normalized Gaussian curve to the number of particles
+                    nPlasmaRadius = fitGaussian( radius, nPlasmaRadius, nMin );
+
+                    % Multiply by number of particles
+                    nPlasmaRadius = nPlasmaRadius .* nPlasmaPerK;
+                else
+                    % Smooth data
+                    nPlasmaRadius = smoothdata( nPlasmaRadius, 2, 'gaussian', 50 );
+                end
+            end
             
-%             if k == 1
-%                 % Fit a normalized Gaussian curve to the number of particles
-%                 nPlasmaRadius = fitGaussian( radius, nPlasmaRadius, nMin );
-%             else
-%                 % Smooth data
-%                 nPlasmaRadius = smoothdata( nPlasmaRadius, 2, 'gaussian', 50 );
-%             end
-%             
-%             % Normalization factor to conserve number of particles after
-%             %   smoothing
-%             nPlasmaNorm = nPlasmaPerK / sum(nPlasmaRadius);
-%             
-%             % Normalize
-%             nPlasmaRadius = nPlasmaRadius .* nPlasmaNorm;
+            % Add to sum of all collisions array
+            nPlasmaRadiusSum = nPlasmaRadiusSum + nPlasmaRadius;
             
             % Plot 1D plasma propagation
             figure(figPropagation1D);
@@ -675,32 +729,27 @@ if iAngle == 1
             hold on;
             plot( radius, nPlasmaRadius, ...
                   'LineWidth', 2, ...
-                  'DisplayName', [num2str(k) ' coll.' ] );
-            title([num2str(time(iTime), 3) ' s' ]);
-            xlim([0 0.05]);
-            ylim([0 12E11]);
+                  'DisplayName', [num2str(k - 1) ' coll.' ] );
+        end
+        
+        plot( radius, nPlasmaRadiusSum, ...
+          'LineWidth', 2, ...
+          'Color', 'k', ...
+          'DisplayName', 'Sum' );
+      
+        title([num2str(time(iTime), 3) ' s' ]);
+        xlim([0 0.05]);
+        ylim([0 24E11]);
+        xlabel('Distance [m]');
+        if index == 1
+            ylabel('Number of particles');
         end
 
-        % Calculate total number of particles per radial bin
-%         nPlasmaRadius = nParticlesPerRadius( radius, plasmaMatrix );
+        % Calculate total number of background particles per radial bin
         nBGRadius = nParticlesPerRadius( radius, bgMatrix );
         
+        % Smooth background data
         nBGRadius = smoothdata( nBGRadius, 2, 'gaussian', 50 );
-                
-        % Normalization factor to conserve number of particles after
-        %   smoothing
-%         nPlasmaNorm = nPlasmaTotal / sum(nPlasmaRadius);
-        nBGNorm = nBGTotal / sum(nBGRadius);
-%         
-%         % Normalize
-%         nPlasmaRadius = nPlasmaRadius .* nPlasmaNorm;
-        nBGRadius = nBGRadius .* nBGNorm;
-        
-        % Fit a normalized Gaussian curve to the number of particles
-%         nPlasmaFit = fitGaussian( radius, nPlasmaRadius, nMin );
-        
-        % Multiply by the total number of particles at this angle
-%         nPlasmaRadius = nPlasmaFit .* nParticleAngle(iAngle);
           
         % Plot 1D background propagation
         figure(figBGPropagation1D);
@@ -711,37 +760,37 @@ if iAngle == 1
     end
 end
 
-% %--------------------------------------------------------------------------
-% % Debug per time step
-% %--------------------------------------------------------------------------
-% 
-% if debugBool == true
-%     % Calculate total number of particles for background and plasma
-%     nBGTotalNew = sum(sum( bgMatrix ));
-%     nPlasmaTotalNew = sum(sum( plasmaMatrix ));
-% 
-%     % Check conservation of background particles
-%     if (nBGTotal - nBGTotalNew) > nMin
-%         disp(['Background particles not conserved ' ...
-%               num2str(nBGTotal - nBGTotalNew, '%.3E') ...
-%               ' particles lost.']);
-%     elseif (nBGTotal - nBGTotalNew) < -nMin
-%         disp(['Background particles not conserved ' ...
-%               num2str(nBGTotalNew - nBGTotal, '%.3E') ...
-%               ' particles gained.']);
-%     end
-% 
-%     % Check conservation of plasma particles
-%     if (nPlasmaTotal - nPlasmaTotalNew) > nMin
-%         disp(['Plasma particles not conserved ' ...
-%               num2str(nParticleAngle(iAngle) - nPlasmaTotalNew, '%.3E') ...
-%               ' particles lost.']);
-%     elseif (nPlasmaTotal - nPlasmaTotalNew) < -nMin
-%         disp(['Plasma particles not conserved ' ...
-%               num2str(nPlasmaTotalNew - nParticleAngle(iAngle), '%.3E') ...
-%               ' particles gained.']);
-%     end
-% end
+%--------------------------------------------------------------------------
+% Debug per time step
+%--------------------------------------------------------------------------
+
+if debugBool
+    % Calculate total number of particles for background and plasma
+    nBGTotalNew = sum(sum( bgMatrix ));
+    nPlasmaTotalNew = sum(sum( plasmaMatrix ));
+
+    % Check conservation of background particles
+    if (nBGTotal - nBGTotalNew) > nMin
+        disp(['Background particles not conserved ' ...
+              num2str(nBGTotal - nBGTotalNew, '%.3E') ...
+              ' particles lost.']);
+    elseif (nBGTotal - nBGTotalNew) < -nMin
+        disp(['Background particles not conserved ' ...
+              num2str(nBGTotalNew - nBGTotal, '%.3E') ...
+              ' particles gained.']);
+    end
+
+    % Check conservation of plasma particles
+    if (nPlasmaTotal - nPlasmaTotalNew) > nMin
+        disp(['Plasma particles not conserved ' ...
+              num2str(nParticleAngle(iAngle) - nPlasmaTotalNew, '%.3E') ...
+              ' particles lost.']);
+    elseif (nPlasmaTotal - nPlasmaTotalNew) < -nMin
+        disp(['Plasma particles not conserved ' ...
+              num2str(nPlasmaTotalNew - nParticleAngle(iAngle), '%.3E') ...
+              ' particles gained.']);
+    end
+end
 
 end % Time loop
 
@@ -752,17 +801,17 @@ end % Angle loop
 % 1D plasma propagation
 figure(figPropagation1D);
 legend;
-% xlim([0 0.05]);
-% ylim([0 5E12]);
-% title('1D propagation of Ti from TiO_2 target in 0.02 mbar O_2 background');
-% xlabel('Target distance [m]');
-% ylabel('Number of particles per radial bin');
+% sgtitle('1D propagation of Ti from TiO_2 target in 0.02 mbar O_2 background');
+sgtitle('1D propagation of O from TiO_2 target in 0.02 mbar O_2 background');
 
 % 1D background propagation
 figure(figBGPropagation1D);
 legend;
 xlim([0 0.05]);
 % ylim([0 1E21]);
-title('1D propagation of background O_2 gas particles');
+% title('1D propagation of background O_2 gas particles from collisions with Ti plasma at 0.02 mbar');
+title('1D propagation of background O_2 gas particles from collisions with O plasma at 0.02 mbar');
 xlabel('Target distance [m]');
 ylabel('Particle density [m^-^3]');
+
+toc;

@@ -73,7 +73,7 @@ else
     % Skip last bin as particles cannot move further
     
     % Calculate sum of all particles in radial bin
-    nParticleRadius = sum( particleMatrix(:, :, iRadius) );
+    nParticleRadius = sum( particleMatrix(:, :, iRadius), 2 );
     
     % If no particles are present in radial bin, skip to next radial bin
     if sum(nParticleRadius) < (nMin * nSpecies)
@@ -94,7 +94,7 @@ else
     %--------------------------------------------------------------------------
     
     % Number of plasma particles in current bin
-    nParticle = particleMatrix(iVelo, iSpeciesRadius, iRadius);
+    nParticle = particleMatrix(iSpeciesRadius, iVelo, iRadius);
     
     % Logical array holding locations of velocity bins with enough particles
     iParticle = nParticle >= nMin;
@@ -127,12 +127,12 @@ else
     %--------------------------------------------------------------------------
     
     % Remove non-colliding particles to new position
-    particleMatrix(iVelo, iSpeciesVelo, iRadius) = ...
-        particleMatrix(iVelo, iSpeciesVelo, iRadius) - nParticle;
+    particleMatrix(iSpeciesVelo, iVelo, iRadius) = ...
+        particleMatrix(iSpeciesVelo, iVelo, iRadius) - nParticle;
 
     % Add non-colliding particles to new position
-    particleMatrix(iVelo, iSpeciesVelo, iRadius + nRadiusDelta) = ...
-        particleMatrix(iVelo, iSpeciesVelo, iRadius + nRadiusDelta) + nParticle;
+    particleMatrix(iSpeciesVelo, iVelo, iRadius + nRadiusDelta) = ...
+        particleMatrix(iSpeciesVelo, iVelo, iRadius + nRadiusDelta) + nParticle;
 
     end % Velocity loop
 

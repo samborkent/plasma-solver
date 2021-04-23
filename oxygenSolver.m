@@ -83,7 +83,10 @@ commentString = [ ' ' ...
 %--------------------------------------------------------------------------
 
 % Minimal number of particles per bin
-nMin = 1000;
+nMin = 1E5;
+
+% Maximum number of collisions
+kMax = 5;
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -96,13 +99,13 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Temporal limits
 timeMin     = 0;        % Start time [s]
-timeMax     = 8E-6;     % End time [s]
+timeMax     = 4E-6;     % End time [s]
 timeDelta   = 1E-7;     % Time step duration [s]
 
 % Radial limits
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
-radiusDelta = 2E-5;     % Radial step size [m]
+radiusDelta = 4E-5;    % Radial step size [m]
 
 % Velocity limits
 veloMax         = 2.5E4; % Maximal initial velocity
@@ -245,7 +248,7 @@ nVelo       = numel(velo);
 nSpecies = nElements + 2*(nElements - 1);
 
 % Plasma matrices
-plasmaMatrix = zeros(nVelo, nSpecies, nRadius);
+plasmaMatrix = zeros(nSpecies, kMax, nVelo, nRadius);
 plasmaSub = plasmaMatrix;
 plasmaAdd = plasmaSub;
 
@@ -346,7 +349,7 @@ nPlasmaTotal = nParticleAngle(iAngle) .* uc.AMOUNT ./ sum(uc.AMOUNT);
                                                1 );
                                            
 % Fill into the plasma matrix
-plasmaMatrix(:, 1:nElements, 1) = nParticleVeloInit;
+plasmaMatrix(1:nElements, 1, :, 1) = nParticleVeloInit';
 
 for iTime = 1 : nTime
 %% Calculations per time step
@@ -378,7 +381,7 @@ for iRadius = endRadius : -1 : 1
 % Skip last bin as particles cannot move further
 
 % Calculate sum of all particles in radial bin
-nPlasmaRadius = sum( plasmaMatrix(:, :, iRadius) );
+nPlasmaRadius = sum( plasmaMatrix(:, :, :, iRadius), [2 3] );
 
 % If no particles are present in radial bin, skip to next radial bin
 if sum(nPlasmaRadius) < nMinSum
@@ -399,7 +402,7 @@ for iVelo = nVelo : -1 : 2
 %--------------------------------------------------------------------------
 
 % Number of plasma particles in current bin
-nPlasma = plasmaMatrix(iVelo, iSpeciesRadius, iRadius);
+nPlasma = plasmaMatrix(iSpeciesRadius, 1, iVelo, iRadius);
 
 % Logical array holding locations of velocity bins with enough particles
 iPlasma = nPlasma >= nMin;
@@ -481,7 +484,7 @@ colRate = ( bgDensity * radiusDelta * veloWeight(iVelo, iVeloBG) ) ...
           .* sigmaArray(iSpeciesVelo);
 
 % Number of collided particles
-nCol = colRate .* nPlasmaVelo;
+nCol = colRate' .* nPlasmaVelo;
 
 % Logical array with location ofspecies with enough collisions
 iCol = nCol >= nMin;
@@ -571,13 +574,13 @@ for i = 1 : numel(iSpeciesCol)
         bgAdd( iNewVeloBG(i), thisRadius + nNewRadiusDeltaBG(i) ) + nCol(i);
 
     % Remove collided plasma particles from starting position
-    plasmaSub( iVelo, iSpeciesCol(i), iRadius ) = ...
-        plasmaSub( iVelo, iSpeciesCol(i), iRadius ) - nCol(i);
+    plasmaSub( iSpeciesCol(i), 1, iVelo, iRadius ) = ...
+        plasmaSub( iSpeciesCol(i), 1, iVelo,  iRadius ) - nCol(i);
 
     % Add collided plasma particles to new position and new velocity after
     %   collision
-    plasmaAdd( iNewVelo(i), iSpeciesCol(i), thisRadius + nNewRadiusDelta(i) ) = ...
-       plasmaAdd( iNewVelo(i), iSpeciesCol(i), thisRadius + nNewRadiusDelta(i) ) + nCol(i);
+    plasmaAdd( iSpeciesCol(i), 1, iNewVelo(i), thisRadius + nNewRadiusDelta(i) ) = ...
+       plasmaAdd( iSpeciesCol(i), 1, iNewVelo(i), thisRadius + nNewRadiusDelta(i) ) + nCol(i);
 end
 
 end % Background velocity loop
@@ -597,7 +600,7 @@ plasmaMatrix = plasmaMatrix + plasmaSub;
 bgMatrix = bgMatrix + bgSub;
 
 % Update non-collided plasma particles
-plasmaMatrix = updateMatrix( plasmaMatrix, ...
+plasmaMatrix(:, 1, :, :) = updateMatrix( squeeze(plasmaMatrix(:, 1, :, :)), ...
                              nRadius, ...
                              nVelo, ...
                              nMin );
@@ -619,7 +622,7 @@ bgMatrix = bgMatrix + bgAdd;
 % Only for first angle (center of the plume)
 if iAngle == 1   
     % Only for specific times
-    if (iTime == 11)  || (iTime ==  16) || (iTime == 31) || (iTime ==  46) || ...
+    if (iTime == 6) || (iTime == 11)  || (iTime ==  16) || (iTime == 31) || (iTime ==  46) || ...
        (iTime == 51)  || (iTime ==  61) || (iTime == 71)
 %     if (iTime == 11)  || (iTime ==  21) || (iTime == 31) || (iTime ==  41) || ...
 %        (iTime == 51)  || (iTime ==  61) || (iTime == 91) || (iTime == 121) || ...
@@ -643,7 +646,7 @@ if iAngle == 1
         % Loop through plasma species
         for iSpecies = 1 : 2
             % Calculate total number of particles per radial bin
-            nParticleRadius = nParticlesPerRadius( radius, plasmaMatrix(:, species(iSpecies), :) );
+            nParticleRadius = nParticlesPerRadius( radius, plasmaMatrix(species(iSpecies), 1, :, :) );
             
 %             nParticleRadius = smoothdata(nParticleRadius, 2, 'gaussian', 50);
 %             
