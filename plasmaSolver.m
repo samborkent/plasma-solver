@@ -94,7 +94,7 @@ kMax = 3;
 veloSmoothingBool = true;
 
 % Width of the Gaussian smoothing function for smoothing the non-collided
-%   particle verlocities
+%   particle velocities
 %   * 3 corresponds roughly due to 400 m/s
 smoothWidth = 3;
 

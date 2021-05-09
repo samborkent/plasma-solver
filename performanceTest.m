@@ -1,30 +1,16 @@
-%% PLASMASOLVER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%            Author: Sam Borkent
-%
-% Based on paper by: Tom Wijnands
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% Naming conventions:
-%
-%   bg      : Background
-%   bin     : Computational bin with equal position and velocity
-%   n       : Number of particles/bins
-%   velo    : Velocity
-%   uc      : Unit cell
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% Initialization
 % Do not change!
-
-tic;
 
 %--------------------------------------------------------------------------
 % Clear workspace
 %--------------------------------------------------------------------------
 clc, clear, close all
+
+%--------------------------------------------------------------------------
+% Timer
+%--------------------------------------------------------------------------
+
+timerTotal = tic;
 
 %--------------------------------------------------------------------------
 % Path settings
@@ -83,7 +69,20 @@ commentString = [ ' ' ...
 %--------------------------------------------------------------------------
 
 % Minimal number of particles per bin
-nMin = 1000;
+nMin = 1E7;
+
+% Maximum number of collisions
+kMax = 3;
+
+% Switch velocity smoothing for non -collided particles on or off (true / false)
+%   * Circumvents quantization error, impacts performance greatly
+%   * Conserves number of particles
+veloSmoothingBool = true;
+
+% Width of the Gaussian smoothing function for smoothing the non-collided
+%   particle verlocities
+%   * 3 corresponds roughly due to 400 m/s
+smoothWidth = 5;
 
 %--------------------------------------------------------------------------
 % Dimensional limits
@@ -96,13 +95,13 @@ angleDelta  = 3;        % Radial step size [deg]
 
 % Temporal limits
 timeMin     = 0;        % Start time [s]
-timeMax     = 8E-6;     % End time [s]
+timeMax     = 10E-6;    % End time [s]
 timeDelta   = 1E-7;     % Time step duration [s]
 
 % Radial limits
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
-radiusDelta = 10E-5;     % Radial step size [m]
+radiusDelta = 5E-5;     % Radial step size [m]
 
 % Velocity limits
 veloMax         = 2.5E4; % Maximal initial velocity
@@ -154,7 +153,7 @@ spotWidth       = 1E-3;
 spotHeight      = 2.1E-3;
 
 % Ablation depth into the target for a single pulse [m]
-%   * Calculate per target for most accurate result.
+%   * For most accurate results calculate per target.
 %   Default: 100E-9
 ablationDepth   = 100E-9;
 
@@ -239,59 +238,37 @@ nVelo       = numel(velo);
 
 %% Pre-allocations
 
-%   Metal atom              M   : 1
-%   Oxygen atom             O   : 2
+nSpecies = nElements + 2*(nElements - 1) + 1;
 
-nSpecies = nElements + 2*(nElements - 1);
+% Plasma particle matrix
+timer0 = tic;
+% plasmaMatrix = zeros(kMax, nSpecies, nVelo, nRadius);
+particleMatrix = zeros(nVelo, nSpecies, nRadius);
+% plasmaSub = plasmaMatrix.*0;
+collisionMatrix = particleMatrix.*0;
+time0 = toc(timer0);
 
-% Plasma matrices
-plasmaMatrix = zeros(nVelo, nSpecies, nRadius);
-plasmaSub = plasmaMatrix;
-plasmaAdd = plasmaSub;
-
-% Background matrices
 bgMatrix = zeros(nVelo, nRadius);
-bgSub = bgMatrix;
-bgAdd = bgSub;
 
 %% Pre-calculations
+
+sigma   = pi .* ( 2*PT.O.RADIUS + [PT.Ti.RADIUS PT.O.RADIUS PT.Ti.RADIUS+PT.O.RADIUS PT.Ti.RADIUS+2*PT.O.RADIUS] ).^2;
+mass    = [PT.Ti.MASS PT.O.MASS PT.Ti.MASS+PT.O.MASS PT.Ti.MASS+2*PT.O.MASS];
+% mass    = PT.O.MASS;
+massBG  = 2*PT.O.MASS;
 
 % Matrix containing all possible velocity weights
 veloWeight = (velo' - velo) ./ (velo' + velo);
 
-% Angular plasma particle distribution
-nParticleAngle = angularDistribution( angle,        ...
-                                      radiusDelta,  ...
-                                      cosPowerFit,  ...
-                                      nAtomAblated );
-
-%% Initialize figures
-
-% % 1D plasma propagation figure
-% figPropagation1D = figure('Name', '1D plasma particle propagation');
-% hold on;
-% 
-% % 1D background propagation figure
-% figBGPropagation1D = figure('Name', '1D background particle propagation');
-% hold on;
-
-%% Main program
-
-% Temporary values for testing
-radiusBG = 2*PT.O.RADIUS;
-sigmaArray   = pi .* ( radiusBG + [uc.ELEMENTS.RADIUS] ).^2;
-massBG    = 2*PT.O.MASS;
-massArray = [uc.ELEMENTS.MASS];
-
 iNewVeloMatrix = zeros(nVelo, nElements, nVelo);
 iNewVeloBGMatrix = zeros(nVelo, nElements, nVelo);
 
-for iSpecies = 1 : nElements
-    iNewVeloMatrix(:, iSpecies, :) = round( (velo'.*(massArray(iSpecies) - massBG) ...
-        + 2*massBG.*velo) ./ (massArray(iSpecies) + massBG) ./ veloDelta );
+for iSpecies = 1 : nSpecies-1
+    iNewVeloMatrix(:, iSpecies, :) = round( (velo'.*(mass(iSpecies) - massBG) ...
+        + 2*massBG.*velo) ./ (mass(iSpecies) + massBG) ./ veloDelta );
     
-    iNewVeloBGMatrix(:, iSpecies, :) = round( (velo'.*(massBG - massArray(iSpecies)) ...
-        + 2*massArray(iSpecies).*velo) ./ (massArray(iSpecies) + massBG) ./ veloDelta );
+    iNewVeloBGMatrix(:, iSpecies, :) = round( (velo'.*(massBG - mass(iSpecies)) ...
+        + 2*mass(iSpecies).*velo) ./ (mass(iSpecies) + massBG) ./ veloDelta );
 end
 
 % Prevent index out-of-range error
@@ -300,36 +277,28 @@ iNewVeloBGMatrix(iNewVeloBGMatrix < 1) = 1;
 iNewVeloMatrix(iNewVeloMatrix > nVelo) = nVelo;
 iNewVeloBGMatrix(iNewVeloBGMatrix > nVelo) = nVelo;
 
-nMinSum = nMin * nElements;
-                                  
-for iAngle = 1 : 1 % nAngle
-%% Calculations per angle
+% Angular plasma particle distribution
+nParticleAngle = angularDistribution( angle,        ...
+                                      radiusDelta,  ...
+                                      cosPowerFit,  ...
+                                      nAtomAblated );
 
-% Skip angle if there are not enough particles present
-if nParticleAngle(iAngle) < nMin
-    continue
-end
-
-% Reset matrices
-if iAngle > 1
-    plasmaMatrix = plasmaMatrix.*0;
-    bgMatrix = bgMatrix.*0;
-end
+%% Main program
 
 % Pre-allocate background gas particle matrix and fill matrix based on
 %   calculated density, also retrieve bin volumes per radial bin
-[bgMatrix(1,:), binVolume] = fillBGMatrix( bgDensity,    ...
-                                      radius,       ...
-                                      angle,        ...
-                                      iAngle,       ...
-                                      radiusDelta );
-                                  
+[particleMatrix(1, 1, :), binVolume] = fillBGMatrix( bgDensity,    ...
+                                                     radius,       ...
+                                                     angle,        ...
+                                                     1,            ...
+                                                     radiusDelta );
+                                        
 % Total number of background particles at this angle
-nBGTotal = sum( bgMatrix(1, :) );
+nBGTotal = sum( particleMatrix(1, 1, :) );
 
 % Total number of plasma particles at this angle
-nPlasmaTotal = nParticleAngle(iAngle) .* uc.AMOUNT ./ sum(uc.AMOUNT);
-                                  
+nPlasmaTotal = nParticleAngle(1) ./ [uc.AMOUNT];
+
 % Calculate the initial particle velocity distribution
 [nParticleVeloInit, veloPlasma] = initialVelocityDistribution(          ...
                                                plotVelDisInit,          ...
@@ -342,77 +311,58 @@ nPlasmaTotal = nParticleAngle(iAngle) .* uc.AMOUNT ./ sum(uc.AMOUNT);
                                                energyLaser,             ...
                                                heatTarget,              ...
                                                absorption,              ...
-                                               nParticleAngle(iAngle),  ...
+                                               nParticleAngle(1),       ...
                                                1 );
-                                           
-% Fill into the plasma matrix
-plasmaMatrix(:, 1:nElements, 1) = nParticleVeloInit;
 
-for iTime = 1 : nTime
+% Fill into the plasma matrix
+particleMatrix(:, 2:3, 1) = nParticleVeloInit(:, 1:2);
+
+nLoops = 0;
+errorCount = 0;
+
+for iTime = 1 : 62 % nTime
 %% Calculations per time step
 
-%--------------------------------------------------------------------------
-% Reset update matrices for t+1
-%--------------------------------------------------------------------------
+% Reset collision matrix
+collisionMatrix = collisionMatrix.*0;
 
-plasmaSub = plasmaSub.*0;
-plasmaAdd = plasmaSub;
-bgSub = bgSub.*0;
-bgAdd = bgSub;
+% Total number of particles
+particleTotal = sum( particleMatrix, 'all' );
 
-%--------------------------------------------------------------------------
-% Calculate furthest possible occupied radial bin
-%--------------------------------------------------------------------------
+% if iTime > 1
+%     % Smooth velocities
+%     particleMatrix(2:end, :, :) = smoothdata( particleMatrix(2:end, :, :), 1, 'gaussian', smoothWidth );
+% end
 
-% Only loop through radial bins where particles could potentially be
-%   present
-if (nVelo * iTime) < nRadius
-    endRadius = (nVelo * iTime) - 1;
-else
-    endRadius = nRadius - 1;
-end
+% Remove all particles below threshold
+particleMatrix(particleMatrix < nMin) = 0;
 
-for iSpecies = nElements : -1 : 1
-% Loop from lowest to highest mass
+% Normalize number of particles and add removed particles back to filled bins
+particleMatrix = ( particleMatrix ./ sum(particleMatrix, 'all') ) .* particleTotal;
 
-for iRadius = endRadius : -1 : 1
+% Calculate collision rate matrix
+collisionRate = ( particleMatrix(:, 1, :) ./ reshape(binVolume, 1, 1, nRadius) ) ...
+                .* radiusDelta .* sigma;
+
+timerA = tic;
+for iRadius = (nRadius - 1) : -1 : 1
 %% Calculations per radial bin
 % Loop backwards to prevent counting particles twice
 % Skip last bin as particles cannot move further
 
-% Calculate sum of all particles in radial bin
-nPlasmaRadius = sum( plasmaMatrix(:, iSpecies, iRadius) );
-
-% If no particles are present in radial bin, skip to next radial bin
-if nPlasmaRadius < nMin
-    continue
-end
-
 for iVelo = nVelo : -1 : 2
-%% Calculations per plasma velocity bin
+%% Calculations per non-oxidizing plasma velocity bin
 % Loop backwards as fast particles travel in front of slower particles
 % Only loop through velocities that traverse at least one radial bin per
 %   time step
 
-%--------------------------------------------------------------------------
-% Get plasma particle variables
-%--------------------------------------------------------------------------
-
-% Number of plasma particles in current bin
-nPlasma = plasmaMatrix(iVelo, iSpecies, iRadius);
-
-% If no filled bins remain, skip to next radial bin
-if nPlasma < nMin
+% If number of plasma particles is zero
+if particleMatrix(iVelo, 2:end, iRadius) == 0
     continue
 end
 
-% Temporary variable holding remaining number of traveling particles after
-%   subsequent collisions with the background
-nPlasmaTemp = nPlasma;
-
-%--------------------------------------------------------------------------
-% Set number of expected traveled radial bins if no collisions would occur
-%--------------------------------------------------------------------------
+% Remaining number of particles
+nPlasmaTemp = particleMatrix(iVelo, 2:end, iRadius);
 
 % Restrict number of traveled bins to the total number of
 %   radial bins
@@ -428,7 +378,7 @@ for jRadius = 0 : (nRadiusDelta - 1)
 % Collisions occur first in the bin closest to starting bin
 
 % Break loop if no more particles are left to collide
-if nPlasmaTemp < nMin
+if sum(nPlasmaTemp) < nMin
     break
 end
 
@@ -441,95 +391,44 @@ for iVeloBG = 1 : (iVelo - 1)
 % From slowest to highest as collisions with slow moving background
 %   particles are more probable
 
+timerC = tic;
 % Break loop if no more particles are left to collide
-if nPlasmaTemp < nMin
+if sum(nPlasmaTemp) < nMin
     break
 end
 
-%--------------------------------------------------------------------------
-% Get number of background particles
-%--------------------------------------------------------------------------
-
-% Number of background particals in this bin
-%   Original number minus the already collided particles
-nBG = bgMatrix(iVeloBG, thisRadius) + bgSub(iVeloBG, thisRadius);
-
-% Skip background velocity if the number of background particles is below
-%   the threshold
-if nBG < nMin
+% If number of background particles is below threshold
+if particleMatrix(iVeloBG, 1, thisRadius) == 0
     continue
 end
 
-%--------------------------------------------------------------------------
-% Calculate number of collisions
-%--------------------------------------------------------------------------
-
-% Background particle density in current bin
-bgDensity = nBG / binVolume(thisRadius);
-
-% Collision rate
-colRate = ( bgDensity * radiusDelta * veloWeight(iVelo, iVeloBG) ) ...
-          * sigmaArray(iSpecies);
-
-% Number of collided particles
-nCol = colRate .* nPlasmaTemp;
+% Number of collisions array
+nCol = veloWeight(iVelo, iVeloBG) .* collisionRate(iVeloBG, :, thisRadius) .* nPlasmaTemp;
 
 % Skip iteration if the number of collisions is smaller than the threshold
-if nCol < nMin
+if sum(nCol) < nMin
     continue
 end
 
-% Set maximum number of collisions
-if nPlasmaTemp > nBG
-    % Limit number of collisions to the maximum number of collisions
-    nCol(nCol > nBG) = nBG;
-else
-    % Limit number of collisions to the maximum number of collisions
-    nCol(nCol > nPlasmaTemp) = nPlasmaTemp;
+% If the number of collisions is greater than the number of background particles
+if sum(nCol) > particleMatrix(iVeloBG, 1, thisRadius)
+    % Normalize number of collisions to number of background particles
+    %   (minus 1 to avoid faulty comparisons)
+    nCol = (nCol ./ sum(nCol)) .* (particleMatrix(iVeloBG, 1, thisRadius) - 1);
 end
 
 % Update number of non-collided plasma particles
 nPlasmaTemp = nPlasmaTemp - nCol;
+timeC = toc(timerC);
 
 %--------------------------------------------------------------------------
 % Calculate new radial positions after collision
 %--------------------------------------------------------------------------
 
+timerD = tic;
 % Reshape indice arrays
-% iNewVelo = iNewVeloMatrix(iVelo, iSpecies, iVeloBG);
-% iNewVeloBG = iNewVeloBGMatrix(iVelo, iSpecies, iVeloBG);
-
-% deltaVelo = iVelo - iVeloBG;
-% massSum = massArray(iSpecies) + massBG;
-% 
-% iNewVelo = iVelo + round( deltaVelo * (massArray(iSpecies) - massBG) / massSum );
-% iNewVeloBG = iVeloBG + round( 2 * massArray(iSpecies) * deltaVelo / massSum );
-% 
-% iNewVelo(iNewVelo < 1) = 1;
-% iNewVelo(iNewVelo > nVelo) = nVelo;
-% iNewVeloBG(iNewVeloBG < 1) = 1;
-% iNewVeloBG(iNewVeloBG > nVelo) = nVelo;
-
-if iVeloBG == 1
-    iNewVelo = iVelo + round( iVelo * (massArray(iSpecies) - massBG) / (massArray(iSpecies) + massBG) );
-    iNewVeloBG = iVeloBG + round( 2 * massArray(iSpecies) * iVelo / (massArray(iSpecies) + massBG) );
-else
-    iNewVelo = iVelo + round( (iVelo - iVeloBG) * (massArray(iSpecies) - massBG) / (massArray(iSpecies) + massBG) );
-    iNewVeloBG = iVeloBG + round( 2 * massArray(iSpecies) * (iVelo - iVeloBG) / (massArray(iSpecies) + massBG) );
-end
-
-if iNewVelo < 1
-    iNewVelo = 1;
-end
-if iNewVelo > nVelo
-    iNewVelo = nVelo;
-end
-if iNewVeloBG < 1
-    iNewVeloBG = 1;
-end
-if iNewVeloBG > nVelo
-    iNewVeloBG = nVelo;
-end
+iNewVelo = iNewVeloMatrix(iVelo, :, iVeloBG);
+iNewVeloBG = iNewVeloBGMatrix(iVelo, :, iVeloBG);
 
 % New radial index of collided plasma particles
 nNewRadiusDelta = round( velo(iNewVelo) .* (nRadiusDelta - jRadius) ...
@@ -540,167 +439,103 @@ nNewRadiusDeltaBG = round( velo(iNewVeloBG) .* (nRadiusDelta - jRadius) ...
                            .* timeDelta / (nRadiusDelta * radiusDelta) );
 
 % Prevent index out-of-range error
-nNewRadiusDelta(thisRadius + nNewRadiusDelta > nRadius) = nRadius - thisRadius;
-nNewRadiusDeltaBG(thisRadius + nNewRadiusDeltaBG > nRadius) = nRadius - thisRadius;
+nNewRadiusDelta(thisRadius + nNewRadiusDelta > nRadius) = ...
+    nRadius - thisRadius;
+nNewRadiusDeltaBG(thisRadius + nNewRadiusDeltaBG > nRadius) = ...
+    nRadius - thisRadius;
+timeD = toc(timerD);
 
-%--------------------------------------------------------------------------
+%-------------------------------------------------------------------------------
 % Update matrices
-%--------------------------------------------------------------------------
+%-------------------------------------------------------------------------------
 
-% Remove collided background particles from collision position
-bgSub( iVeloBG, thisRadius ) = bgSub( iVeloBG, thisRadius ) - nCol;
+timerE = tic;
+% Remove plasma particles from initial position before collision
+particleMatrix(iVelo, 2:end, iRadius) = particleMatrix(iVelo, 2:end, iRadius) - nCol;
 
-% Add collided background particles to new position and new velocity after
-%   collision
-bgAdd( iNewVeloBG, thisRadius + nNewRadiusDeltaBG ) = ...
-    bgAdd( iNewVeloBG, thisRadius + nNewRadiusDeltaBG ) + nCol;
+% Remove background particles from initial position before collision
+particleMatrix(iVeloBG, 1, thisRadius) = particleMatrix(iVeloBG, 1, thisRadius) - sum(nCol);
 
-% Remove collided plasma particles from starting position
-plasmaSub( iVelo, iSpecies, iRadius ) = ...
-    plasmaSub( iVelo, iSpecies, iRadius ) - nCol;
+for iSpecies = 1 : (nSpecies - 1)
+    % Add plasma particles to new position after collision
+    collisionMatrix(iNewVelo(iSpecies), iSpecies+1, thisRadius + nNewRadiusDelta(iSpecies)) = ...
+        collisionMatrix(iNewVelo(iSpecies), iSpecies+1, thisRadius + nNewRadiusDelta(iSpecies)) + nCol(iSpecies);
 
-% Add collided plasma particles to new position and new velocity after
-%   collision
-plasmaAdd( iNewVelo, iSpecies, thisRadius + nNewRadiusDelta ) = ...
-   plasmaAdd( iNewVelo, iSpecies, thisRadius + nNewRadiusDelta ) + nCol;
+    % Add background particles to new position after collision
+    collisionMatrix(iNewVeloBG(iSpecies), 1, thisRadius + nNewRadiusDeltaBG(iSpecies)) = ...
+        collisionMatrix(iNewVeloBG(iSpecies), 1, thisRadius + nNewRadiusDeltaBG(iSpecies)) + nCol(iSpecies);
+end
+timeE = toc(timerE);
+
+nLoops = nLoops + 1;
 
 end % Background velocity loop
 
-end % Traversed radial bin loop
+end % Traveled distance loop
 
-end % Non-oxidizing plasma velocity loop
+end % Velocity loop
 
 end % Radius loop
+timeA = toc(timerA);
 
-end % Species loop
+timerB = tic;
+particleMatrix = alternativeUpdate(particleMatrix, nVelo, nSpecies);
 
-%--------------------------------------------------------------------------
-% Update non-colliding particles
-%--------------------------------------------------------------------------
+particleMatrix = particleMatrix + collisionMatrix;
+timeB = toc(timerB);
 
-% Remove previously moved collided particles
-plasmaMatrix = plasmaMatrix + plasmaSub;
-bgMatrix = bgMatrix + bgSub;
+% Only for specific times
+if (iTime ==  6) || (iTime == 11) || (iTime == 16) || (iTime == 31) || (iTime == 61)
+    % Loop through plasma species
+    for iSpecies = 1 : 3
+        % Calculate total number of particles per radial bin
+        nParticleRadius = nParticlesPerRadius( radius, particleMatrix(:, iSpecies, :) );
 
-% Update non-collided plasma particles
-plasmaMatrix = updateMatrix( plasmaMatrix, ...
-                             nRadius, ...
-                             nVelo, ...
-                             nMin );
-
-% Update non-collided background particles
-bgMatrix = updateMatrix( bgMatrix, ...
-                         nRadius, ...
-                         nVelo, ...
-                         nMin );
-
-% Add back the previously moved collided particles
-plasmaMatrix = plasmaMatrix + plasmaAdd;
-bgMatrix = bgMatrix + bgAdd;
-
-%--------------------------------------------------------------------------
-% Plot 1D propagation
-%--------------------------------------------------------------------------
-
-% Only for first angle (center of the plume)
-if iAngle == 1   
-    % Only for specific times
-    if (iTime == 11)  || (iTime ==  16) || (iTime == 31) || (iTime ==  46) || ...
-       (iTime == 51)  || (iTime ==  61) || (iTime == 71)
-%     if (iTime == 11)  || (iTime ==  21) || (iTime == 31) || (iTime ==  41) || ...
-%        (iTime == 51)  || (iTime ==  61) || (iTime == 91) || (iTime == 121) || ...
-%        (iTime == 151) || (iTime == 181)
-
-        nBGRadius = nParticlesPerRadius( radius, bgMatrix );
-
-        figure(5);
+        figure(iSpecies);
         hold on;
-
-        plot( radius, nBGRadius ./ binVolume, ...
-              'LineWidth', 2, ...
-              'DisplayName', [num2str(time(iTime), 3) ' s' ] );
-
-        xlim([0 0.05]);
-        legend;
-        hold off;
-        
-        species = [1 2 5];
-
-        % Loop through plasma species
-        for iSpecies = 1 : 2
-            % Calculate total number of particles per radial bin
-            nParticleRadius = nParticlesPerRadius( radius, plasmaMatrix(:, species(iSpecies), :) );
-            
-%             nParticleRadius = smoothdata(nParticleRadius, 2, 'gaussian', 50);
-%             
-%             if species(iSpecies) == nSpecies
-%                 nParticleNorm = nBGTotal / sum(nParticleRadius);
-%             else
-%                 nParticleNorm = nPlasmaTotal(iSpecies) / sum(nParticleRadius);
-%             end
-%             
-%             nParticleRadius = nParticleRadius .* nParticleNorm;
-            
-            figure(iSpecies);
-            hold on;
-              
+        if iSpecies == 1
+            plot( radius, nParticleRadius ./ binVolume, ...
+                  'LineWidth', 2, ...
+                  'DisplayName', [num2str(time(iTime), 3) ' s' ] );
+        else
             plot( radius, nParticleRadius, ...
                   'LineWidth', 2, ...
                   'DisplayName', [num2str(time(iTime), 3) ' s' ] );
-            
-            xlim([0 0.05]);
-            legend;
-            hold off;
         end
-        
-%         % Smooth data
-%         nPlasmaRadius = smoothdata(nPlasmaRadius, 2, 'gaussian', 100);
-%         nBGRadius = smoothdata(nBGRadius, 2, 'gaussian', 50);
-%                 
-%         % Normalization factor to conserve number of particles
-%         nPlasmaNorm = nPlasmaTotal / sum(nPlasmaRadius);
-%         nBGNorm = nBGTotal / sum(nBGRadius);
-%         
-%         % Normalize
-%         nPlasmaRadius = nPlasmaRadius .* nPlasmaNorm;
-%         nBGRadius = nBGRadius .* nBGNorm;
-
-%         % Plot 1D plasma propagation
-%         figure(figPropagation1D);
-%         plot( radius, nPlasmaRadius, ...
-%               'LineWidth', 2, ...
-%               'DisplayName', [num2str(time(iTime), 3) ' s' ] );
-%           
-%         % Plot 1D background propagation
-%         figure(figBGPropagation1D);
-%         plot( radius, nBGRadius ./ binVolume, ...
-%               'LineWidth', 2, ...
-%               'DisplayName', [num2str(time(iTime), 3) ' s' ] );
-    end % If Time
-end % If Angle
+        xlim([0 0.05]);
+        legend;
+        hold off;
+    end
+end
 
 end % Time loop
 
-end % Angle loop
+timeTotal = toc(timerTotal);
 
-% %% Plot settings
-% 
-% % 1D plasma propagation
-% figure(figPropagation1D);
-% legend;
-% xlim([0 0.05]);
-% % ylim([0 5E12]);
-% title('1D propagation of Ti from TiO_2 target in 0.02 mbar O_2 background');
-% xlabel('Target distance [m]');
-% ylabel('Number of particles per radial bin');
-% 
-% % 1D background propagation
-% figure(figBGPropagation1D);
-% legend;
-% xlim([0 0.05]);
-% % ylim([0 1E21]);
-% title('1D propagation of background O_2 gas particles');
-% xlabel('Target distance [m]');
-% ylabel('Particle density [m^-^3]');
+function matrix = alternativeUpdate(matrix, nVelo, nSpecies)
+    for iVelo = nVelo : -1 : 2
+%         matrix(:, :, iVelo, end-iVelo+1) = ...
+%             sum( matrix(:, :, iVelo, end-iVelo+1:end), 'all' );
+        matrix(iVelo, :, iVelo:end) = matrix(iVelo, :, 1:end-iVelo+1);
+        matrix(iVelo, :, 1:iVelo-1) = zeros(1, nSpecies, iVelo-1);
+    end
+end
 
-toc;
+function matrix = quickUpdate(matrix, nVelo, nRadius, nMin)
+    for iRadius = nRadius - 1 : -1 : 1   
+        for iVelo = nVelo : -1 : 2
+            if matrix(iVelo, iRadius) > nMin
+                if (iRadius + iVelo - 1) > nRadius
+                    nRadiusTraveled = nRadius - iRadius;
+                else
+                    nRadiusTraveled = iVelo - 1;
+                end
+            
+                matrix(iVelo, iRadius + nRadiusTraveled) = ...
+                    matrix(iVelo, iRadius + nRadiusTraveled) ...
+                    + matrix(iVelo, iRadius);
+                matrix(iVelo, iRadius) = 0;
+            end
+        end
+    end
+end
