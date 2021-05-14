@@ -7,15 +7,15 @@ smoothValue = 10;
 
 % Remove first and last points to prevent the curve from sloping up at the
 %   limits
-xTemp = x(2 : end-1);
-yTemp = y(2 : end-1);
+x([1 end]) = 0;
+y([1 end]) = 0;
 
 % Only data points above threshold
-xTemp = xTemp(yTemp > yThreshold);
-yTemp = yTemp(yTemp > yThreshold);
+xTemp = x(y > yThreshold);
+yTemp = y(y > yThreshold);
 
 % Fit a Gaussian curve
-fitGauss = fit( xTemp', yTemp', 'gauss2' );
+fitGauss = fit( xTemp.', yTemp.', 'gauss2' );
 
 % Evaluate the Gaussian fit
 curveGauss = feval( fitGauss, xTemp );
@@ -25,6 +25,9 @@ curveGauss = interp1( xTemp, curveGauss, x );
 
 % Smooth data based on width of Gaussian curve
 curveGauss = smooth( x, curveGauss, smoothValue*fitGauss.c1 );
+
+% Remove data below the threshold
+curveGauss(curveGauss < yThreshold) = 0;
 
 % Normalize
 curveGauss = curveGauss ./ sum(curveGauss);

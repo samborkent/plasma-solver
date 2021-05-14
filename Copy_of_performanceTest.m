@@ -71,10 +71,10 @@ commentString = [ ' ' ...
 %--------------------------------------------------------------------------
 
 % Minimal number of particles per bin
-nMin = 1E7;
+nMin = 1E8;
 
 % Maximum number of collisions
-kMax = 10;
+kMax = 2;
 
 % Switch velocity smoothing for non -collided particles on or off (true / false)
 %   * Circumvents quantization error, impacts performance greatly
@@ -103,7 +103,7 @@ timeDelta   = 1E-7;     % Time step duration [s]
 % Radial limits
 radiusMin   = 0;        % Start position [m]
 radiusMax   = 0.06;     % End position [m]
-radiusDelta = 5E-5;     % Radial step size [m]
+radiusDelta = 6E-5;     % Radial step size [m]
 
 % Velocity limits
 veloMax         = 2.5E4; % Maximal initial velocity
@@ -138,7 +138,7 @@ absorption = 0.6;
 %--------------------------------------------------------------------------
 
 % Background gas pressure during depostion [Pa = 1E2 mbar]
-bgPressure      = 0.02E2;
+bgPressure      = 0.1E2; % 0.02E2;
 
 % Temperature of background gas [K]
 %   Default: 300
@@ -240,22 +240,23 @@ nVelo       = numel(velo);
 
 %% Pre-allocations
 
-% nSpecies = nElements + 2*(nElements - 1) + 1;
-nSpecies = 20;
+nSpecies = nElements + 2*(nElements - 1) + 1;
 
 % Plasma particle matrix
 timer0 = tic;
-particleMatrix = zeros(kMax, nSpecies, nVelo, nRadius);
-collisionMatrix = zeros(1, nSpecies, nVelo, nRadius);
-collisionRate = zeros(1, nSpecies-1, nVelo, nRadius);
+% plasmaMatrix = zeros(kMax, nSpecies, nVelo, nRadius);
+particleMatrix = zeros(nSpecies, kMax, nVelo, nRadius);
+% plasmaSub = plasmaMatrix.*0;
+collisionMatrix = zeros(nSpecies, 1, nVelo, nRadius);
+collisionRate = zeros(nSpecies-1, 1, nVelo, nRadius);
 time0 = toc(timer0);
 
 %% Pre-calculations
 
-sigma = zeros(1, nSpecies-1);
-mass = zeros(1, nSpecies-1);
+sigma = zeros(nSpecies-1, 1);
+mass = zeros(nSpecies-1, 1);
 
-sigma(1:4)   = pi .* ( 2*PT.O.RADIUS + [PT.Ti.RADIUS PT.O.RADIUS PT.Ti.RADIUS+PT.O.RADIUS PT.Ti.RADIUS+2*PT.O.RADIUS] ).^2;
+sigma(1:4)   = pi .* ( 2*PT.O.RADIUS + [PT.Ti.RADIUS; PT.O.RADIUS; PT.Ti.RADIUS+PT.O.RADIUS; PT.Ti.RADIUS+2*PT.O.RADIUS] ).^2;
 mass(1:4)    = [PT.Ti.MASS PT.O.MASS PT.Ti.MASS+PT.O.MASS PT.Ti.MASS+2*PT.O.MASS];
 massBG  = 2*PT.O.MASS;
 
@@ -296,7 +297,7 @@ nParticleAngle = angularDistribution( angle,        ...
                                                      radiusDelta );
                                         
 % % Total number of background particles at this angle
-% nBGTotal = sum( particleMatrix(1, 1, 1, :) );+
+% nBGTotal = sum( particleMatrix(1, 1, 1, :) );
 % 
 % % Total number of plasma particles at this angle
 % nPlasmaTotal = nParticleAngle(1) ./ [uc.AMOUNT];
@@ -317,7 +318,7 @@ nParticleAngle = angularDistribution( angle,        ...
                                                1 );
 
 % Fill into the plasma matrix
-particleMatrix(1, 2:3, :, 1) = nParticleVeloInit';
+particleMatrix(2:3, 1, :, 1) = reshape(nParticleVeloInit(:, 1:2)', nElements, 1, nVelo, 1);
 
 nLoops = 0;
 errorCount = 0;
@@ -329,7 +330,7 @@ plotArray = {'Uncollided', 'Collided', 'Total'};
 
 plotIndex = 0;
 
-for iTime = 1 : 32 % nTime
+for iTime = 1 : 62 % nTime
 %% Calculations per time step
 
 % Reset collision matrix
@@ -339,8 +340,10 @@ collisionMatrix = collisionMatrix.*0;
 particleTotal = sum( particleMatrix, 'all' );
 
 % if iTime > 1
+% %     % Smooth velocities of non-collided particles
+% %     particleMatrix(:, 1, 2:end, :) = smoothdata( particleMatrix(:, 1, 2:end, :), 3, 'gaussian', smoothWidth );
 %     % Smooth velocities
-%     particleMatrix(:, 1, 2:end, :) = smoothdata( particleMatrix(:, 1, 2:end, :), 3, 'gaussian', smoothWidth );
+%     particleMatrix(:, :, 2:end, :) = smoothdata( particleMatrix(:, :, 2:end, :), 3, 'gaussian', smoothWidth );
 % end
 
 % Remove all particles below threshold
@@ -350,11 +353,7 @@ particleMatrix(particleMatrix < nMin) = 0;
 particleMatrix = ( particleMatrix ./ sum(particleMatrix, 'all') ) .* particleTotal;
 
 % Calculate collision rate matrix
-%   * The sum is the sum of collided and non-collided background particles
-%   * Reshape ensures the matrix in the numerator is dim(1 x 1 x nVelo x nRadius)
-%       and the array in the denomenator is dim(1 x 1 x 1 x nRadius)
-%   * After multiplication with sigma: dim(1 x nSpecies x nVelo x nRadius)
-collisionRate = ( sum(particleMatrix(:, 1, :, :), 1) ./ reshape(binVolume, 1, 1, 1, nRadius) ) ...
+collisionRate = ( sum(particleMatrix(1, :, :, :), 2) ./ reshape(binVolume, 1, 1, 1, nRadius) ) ...
                 .* radiusDelta .* sigma;
 
 timerA = tic;
@@ -370,14 +369,15 @@ for iVelo = nVelo : -1 : 2
 %   time step
 
 % If number of plasma particles is zero
-if sum(particleMatrix(:, 2:end, iVelo, iRadius), 1) == 0
+if sum(particleMatrix(2:end, :, iVelo, iRadius), 2) == 0
     continue
 end
 
 % Remaining number of particles
-nPlasmaTemp = particleMatrix(:, 2:end, iVelo, iRadius);
+nPlasmaTemp = particleMatrix(2:end, :, iVelo, iRadius);
 
-% Restrict number of traveled bins to the total number of radial bins
+% Restrict number of traveled bins to the total number of
+%   radial bins
 if ( iRadius + iVelo - 1 ) > nRadius
     nRadiusDelta = nRadius - iRadius;
 else
@@ -410,12 +410,12 @@ if sum(nPlasmaTemp, 'all') < nMinSum
 end
 
 % If number of background particles is below threshold
-if sum(particleMatrix(:, 1, iVeloBG, thisRadius), 1) == 0
+if sum(particleMatrix(1, :, iVeloBG, thisRadius), 2) == 0
     continue
 end
 
 % Number of collisions array
-nCol = veloWeight(iVelo, iVeloBG) .* collisionRate(1, :, iVeloBG, thisRadius) .* nPlasmaTemp;
+nCol = veloWeight(iVelo, iVeloBG) .* collisionRate(:, 1, iVeloBG, thisRadius) .* nPlasmaTemp;
 
 % Skip iteration if the number of collisions is smaller than the threshold
 if sum(nCol, 'all') < nMinSum
@@ -423,10 +423,10 @@ if sum(nCol, 'all') < nMinSum
 end
 
 % If the number of collisions is greater than the number of background particles
-if sum(nCol, 'all') > sum(particleMatrix(:, 1, iVeloBG, thisRadius), 1)
+if sum(nCol, 'all') > sum(particleMatrix(1, :, iVeloBG, thisRadius), 2)
     % Normalize number of collisions to number of background particles
     %   (minus 1 to avoid faulty comparisons)
-    nCol = (nCol ./ sum(nCol, 'all')) .* (sum(particleMatrix(:, 1, iVeloBG, thisRadius), 1) - 1);
+    nCol = (nCol ./ sum(nCol, 'all')) .* (sum(particleMatrix(1, :, iVeloBG, thisRadius), 2) - 1);
 end
 
 % Update number of non-collided plasma particles
@@ -463,18 +463,18 @@ timeD = toc(timerD);
 
 timerE = tic;
 % Remove plasma particles from initial position before collision
-particleMatrix(:, 2:end, iVelo, iRadius) = particleMatrix(:, 2:end, iVelo, iRadius) - nCol;
+particleMatrix(2:end, :, iVelo, iRadius) = particleMatrix(2:end, :, iVelo, iRadius) - nCol;
 
 % Remove background particles from initial position before collision
-particleMatrix(:, 1, iVeloBG, thisRadius) = particleMatrix(:, 1, iVeloBG, thisRadius) ...
-    - ( particleMatrix(:, 1, iVeloBG, thisRadius) ./ sum(particleMatrix(:, 1, iVeloBG, thisRadius), 1) ) * sum(nCol, 'all');
+particleMatrix(1, :, iVeloBG, thisRadius) = particleMatrix(1, :, iVeloBG, thisRadius) ...
+    - ( particleMatrix(1, :, iVeloBG, thisRadius) ./ sum(particleMatrix(1, :, iVeloBG, thisRadius)) ) * sum(nCol, 'all');
 
-nColSum = sum(nCol, 1);
+nColSum = sum(nCol, 2);
 
 for iSpecies = 1 : 4 % (nSpecies - 1)
     % Add plasma particles to new position after collision
-    collisionMatrix(1, iSpecies+1, iNewVelo(iSpecies), thisRadius + nNewRadiusDelta(iSpecies)) = ...
-        collisionMatrix(1, iSpecies+1, iNewVelo(iSpecies), thisRadius + nNewRadiusDelta(iSpecies)) + nColSum(iSpecies);
+    collisionMatrix(iSpecies+1, 1, iNewVelo(iSpecies), thisRadius + nNewRadiusDelta(iSpecies)) = ...
+        collisionMatrix(iSpecies+1, 1, iNewVelo(iSpecies), thisRadius + nNewRadiusDelta(iSpecies)) + nColSum(iSpecies);
 
     % Add background particles to new position after collision
     collisionMatrix(1, 1, iNewVeloBG(iSpecies), thisRadius + nNewRadiusDeltaBG(iSpecies)) = ...
@@ -496,11 +496,11 @@ timeA = toc(timerA);
 timerB = tic;
 particleMatrix = alternativeUpdate(particleMatrix, nVelo, nSpecies, kMax);
 
-particleMatrix(2, :, :, :) = particleMatrix(2, :, :, :) + collisionMatrix;
+particleMatrix(:, 2, :, :) = particleMatrix(:, 2, :, :) + collisionMatrix;
 timeB = toc(timerB);
 
 % Only for specific times
-if (iTime ==  6) || (iTime == 11) || (iTime == 16) || (iTime == 31) || (iTime == 61)
+if (iTime ==  6) || (iTime == 11) || (iTime == 21) || (iTime == 31) || (iTime == 61)
     
     plotIndex = plotIndex + 1;
     
@@ -516,11 +516,11 @@ if (iTime ==  6) || (iTime == 11) || (iTime == 16) || (iTime == 31) || (iTime ==
         
         for k = 1 : 2 % kMax
             % Calculate total number of particles per radial bin
-            nParticleRadius = nParticlesPerRadius( radius, particleMatrix(k, iSpecies, :, :) );
+            nParticleRadius = nParticlesPerRadius( radius, particleMatrix(iSpecies, k, :, :) );
 
             if k == 1 && iSpecies ~= 1
                 % Total number of particles for this number of collisions
-                nParticlePerK = sum( particleMatrix(k, iSpecies, :, :), 'all' );
+                nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
 
                 % Fit a normalized Gaussian curve to the number of particles
                 nParticleRadius = fitGaussian( radius, nParticleRadius, nMin )';
@@ -563,6 +563,31 @@ if (iTime ==  6) || (iTime == 11) || (iTime == 16) || (iTime == 31) || (iTime ==
         xlim([0 0.05]);
         legend;
         hold off;
+        
+        veloMeanSquared = zeros(1, nRadius);
+        tempMean = veloMeanSquared;
+        
+        figure(3+iSpecies);
+        subplot(1, 2, 1);
+        hold on;
+        for i = 1 : nRadius
+            veloMeanSquared(i) = sum(reshape(sum(particleMatrix(iSpecies, :, :, i), 2), 1, nVelo) .* (velo.^2)) / sum(particleMatrix(iSpecies, :, :, i), 'all');
+            
+            if iSpecies == 1
+                tempMean(i) = (massBG * veloMeanSquared(i)) / (3 * C.BOLTZMANN);
+            else
+                tempMean(i) = (mass(iSpecies) * veloMeanSquared(i)) / (3 * C.BOLTZMANN);
+            end
+        end
+        plot( radius, sqrt(veloMeanSquared), ...
+              'DisplayName', [num2str(time(iTime), 3) ' s'] );
+        hold off;
+        subplot(1, 2, 2);
+        hold on;
+        plot( radius, tempMean, ...
+              'DisplayName', [num2str(time(iTime), 3) ' s'] );
+        hold off;
+        
     end
 end
 
@@ -575,7 +600,7 @@ function matrix = alternativeUpdate(matrix, nVelo, nSpecies, kMax)
 %         matrix(:, :, iVelo, end-iVelo+1) = ...
 %             sum( matrix(:, :, iVelo, end-iVelo+1:end), 'all' );
         matrix(:, :, iVelo, iVelo:end) = matrix(:, :, iVelo, 1:end-iVelo+1);
-        matrix(:, :, iVelo, 1:iVelo-1) = zeros(kMax, nSpecies, 1, iVelo-1);
+        matrix(:, :, iVelo, 1:iVelo-1) = zeros(nSpecies, kMax, 1, iVelo-1);
     end
 end
 
