@@ -1,0 +1,46 @@
+CONFIGURATION FILE	2021-05-22	16:53
+
+	Preferences:
+Save figures:				0
+Plot 2D results:			0
+	Computational restrictions:
+Minimal number of particless:		1e+08
+Maximum number of collisions:		1
+Non-collided velocity smoothing:	1
+Collided velocity smoothing:		1
+Velocity smoothing width:		3
+Preserve particles in last radial bin:	0
+	Dimensional limits:
+Temporal limits [s]:			0 : 1e-07	: 9.9e-06
+Angular limits [deg]:			0 : 3	: 87
+Radial limits [m]:			0 : 6e-05	: 0.0499
+Velocity limits [m/s]:			0 : 600	: 2.4e+04
+	Material parameters:
+Unit cell components:			TiO_2Li_2O
+Unit cell ratio:			[1  2]
+Target density [kg / m^3]:		0
+Ratio of energy absorbed:		0.6
+	Background gas parameters:
+Background gas molecule [mbar]:		OO
+Background pressure [mbar]:		10
+Background temperature [K]:		300
+Background gas density [m^-3]:		2.41e+21
+	Laser parameters:
+Laser spot width [m]:			0.001
+Laser spot height [m]:			0.0021
+Ablation depth [m]:			1e-07
+Ablation volume [m^3]:			2.1e-13
+Laser fluence [J / cm^2]:		2
+Laser energy [J]:			0.042
+Heat dissipation [J]:			0
+	Model parameters:
+Angular distribution fit parameter:	25
+Initial velocity distribution width:	1.5e+03
+	Number of particles:
+Total number of plasma particles:	7.97e+15
+Total number of background particles:	1.73e+15
+	Timers:
+Total running time [s]:			0.0546
+
+	Comments:
+ Type your comment here.

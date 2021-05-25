@@ -78,7 +78,7 @@ if plotInitVeloDistBool
     end
 
     % Initialize figure
-    figure;
+    figure(numel(atomUC)+2);
     hold on;
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');

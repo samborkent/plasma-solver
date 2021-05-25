@@ -14,23 +14,28 @@ y([1 end]) = 0;
 xTemp = x(y > yThreshold);
 yTemp = y(y > yThreshold);
 
-% Fit a Gaussian curve
-fitGauss = fit( xTemp.', yTemp.', 'gauss2' );
+% At least 6 points are required to fit a gaussian curve
+if numel(y) > 6
+    % Fit a Gaussian curve
+    fitGauss = fit( xTemp.', yTemp.', 'gauss2' );
 
-% Evaluate the Gaussian fit
-curveGauss = feval( fitGauss, xTemp );
+    % Evaluate the Gaussian fit
+    curveGauss = feval( fitGauss, xTemp );
 
-% Interpolate the data to match the original x-axis
-curveGauss = interp1( xTemp, curveGauss, x );
+    % Interpolate the data to match the original x-axis
+    curveGauss = interp1( xTemp, curveGauss, x );
 
-% Smooth data based on width of Gaussian curve
-curveGauss = smooth( x, curveGauss, smoothValue*fitGauss.c1 );
+    % Smooth data based on width of Gaussian curve
+    curveGauss = smooth( x, curveGauss, smoothValue*fitGauss.c1 );
 
-% Remove data below the threshold
-curveGauss(curveGauss < yThreshold) = 0;
+    % Remove data below the threshold
+    curveGauss(curveGauss < yThreshold) = 0;
 
-% Normalize
-curveGauss = curveGauss ./ sum(curveGauss);
+    % Normalize
+    curveGauss = curveGauss ./ sum(curveGauss);
+else
+    curveGauss = y;
+end
 
 end
 
