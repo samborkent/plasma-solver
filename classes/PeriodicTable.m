@@ -43,13 +43,21 @@ classdef PeriodicTable
                     161E-12, ...                            % Radius [m]
                     7.4343  * PhysicalConstants.EV ...      % 1st ionization energy [J]
                    );
-        % Manganese
+        % Strontium
         Sr  = Atom( 38, ...                                 % Atomic number
                     'Sr', ...                               % Symbol
                     'Strontium', ...                        % Name
                     87.62   * PhysicalConstants.AMU, ...    % Mass [kg]
                     219E-12, ...                            % Radius [m]
                     5.6952  * PhysicalConstants.EV ...      % 1st ionization energy [J]
+                   );
+        % Lanthanum
+        La  = Atom( 57, ...                                 % Atomic number
+                    'La', ...                               % Symbol
+                    'Lanthanum', ...                        % Name
+                    138.91  * PhysicalConstants.AMU, ...    % Mass [kg]
+                    195E-12, ...                            % Radius [m]
+                    5.577  * PhysicalConstants.EV ...       % 1st ionization energy [J]
                    );
     end
 end

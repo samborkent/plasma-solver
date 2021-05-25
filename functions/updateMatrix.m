@@ -1,144 +1,31 @@
-function particleMatrix = updateMatrix( particleMatrix, ...
-                                        nRadius, nVelo, nMin )
-%UPDATEMATRIX Update non-colliding particle matrix
+function particleMatrix = updateMatrix( particleMatrix, nVelo, nSpecies, kMax, ...
+                                        preserveParticlesBool )
+%UPDATEMATRIX Update the non-colliding particle positions.
+%   If preserveParticlesBool is true, particles will remain in the last
+%   radial bin and the total number of particles in the particle matrix
+%   will be conserved. Has a significant hit on performance.
+%   If preserveParticlesBool is false, particles will disappear after
+%   reaching the last radial bin.
 
-% Number of species in particle matrix
-nSpecies = size(particleMatrix, 2);
+for iVelo = nVelo : -1 : 2
+%% Calculations per plasma velocity bin
+% Loop backwards as fast particles travel in front of slower particles
+% Skip zero velocity
 
-% Get rid of dimensions of size 1
-if size(particleMatrix, 2) == 1
-    particleMatrix = squeeze(particleMatrix);
+    if preserveParticlesBool
+        % Sum all particles that will pass the last radial bin and insert
+        %   change their position so they will remain in the last radial bin.
+        particleMatrix(:, :, iVelo, end-iVelo+1) = ...
+            sum( particleMatrix(:, :, iVelo, end-iVelo+1:end), 'all' );
+    end
+    
+    % Move particles to new radial bin based on position
+    particleMatrix(:, :, iVelo, iVelo:end) = ...
+        particleMatrix(:, :, iVelo, 1:end-iVelo+1);
+    
+    % Remove particles from previous position
+    particleMatrix(:, :, iVelo, 1:iVelo-1) = zeros(nSpecies, kMax, 1, iVelo-1);
 end
-
-%% If the matrix has 2 dimensions
-if ismatrix(particleMatrix)
-
-    for iRadius = (nRadius - 1) : -1 : 1
-    %% Calculations per radial bin
-    % Loop backwards to prevent counting particles twice
-    % Skip last bin as particles cannot move further
-
-    for iVelo = nVelo : -1 : 2
-    %% Calculations per plasma velocity bin
-    % Loop backwards as fast particles travel in front of slower particles
-    % Only loop through velocities that traverse at least one radial bin
-    %   per time step
-
-    %----------------------------------------------------------------------
-    % Get number of particles
-    %----------------------------------------------------------------------
     
-    % Number of plasma particles in current bin
-    nParticle = particleMatrix(iVelo, iRadius);
-
-    % Skip iteration if the number of particles is below the threshold
-    if nParticle < nMin
-        continue
-    end
-
-    %----------------------------------------------------------------------
-    % Set number of traveled radial bins
-    %----------------------------------------------------------------------
-
-    % Restrict number of traveled bins to the total number of
-    %   radial bins
-    if ( iRadius + iVelo - 1 ) > nRadius
-        nRadiusDelta = nRadius - iRadius;
-    else
-        nRadiusDelta = iVelo - 1;
-    end
-
-    %----------------------------------------------------------------------
-    % Update non-colliding particles
-    %----------------------------------------------------------------------
-
-    % Remove non-colliding particles to new position
-    particleMatrix(iVelo, iRadius) = ...
-        particleMatrix(iVelo, iRadius) - nParticle;
-
-    % Add non-colliding particles to new position
-    particleMatrix(iVelo, iRadius + nRadiusDelta) = ...
-        particleMatrix(iVelo, iRadius + nRadiusDelta) + nParticle;
-
-    end % Velocity loop
-
-    end % Radius loop
-    
-%% If the matrix has more than 2 dimensions
-else
-
-    for iRadius = (nRadius - 1) : -1 : 1
-    %% Calculations per radial bin
-    % Loop backwards to prevent counting particles twice
-    % Skip last bin as particles cannot move further
-    
-    % Calculate sum of all particles in radial bin
-    nParticleRadius = sum( particleMatrix(:, :, iRadius), 2 );
-    
-    % If no particles are present in radial bin, skip to next radial bin
-    if sum(nParticleRadius) < (nMin * nSpecies)
-        continue
-    else
-        % Index of non-empty species
-        iSpeciesRadius = find(nParticleRadius >= nMin);
-    end
-
-    for iVelo = nVelo : -1 : 2
-    %% Calculations per plasma velocity bin
-    % Loop backwards as fast particles travel in front of slower particles
-    % Only loop through velocities that traverse at least one radial bin per
-    %   time step
-    
-    %--------------------------------------------------------------------------
-    % Get plasma particle variables
-    %--------------------------------------------------------------------------
-    
-    % Number of plasma particles in current bin
-    nParticle = particleMatrix(iSpeciesRadius, iVelo, iRadius);
-    
-    % Logical array holding locations of velocity bins with enough particles
-    iParticle = nParticle >= nMin;
-    
-    % Remove empty plasma species
-    nParticle = nParticle(iParticle);
-    
-    % If no filled bins remain, skip to next radial bin
-    if isempty(nParticle)
-        continue
-    end
-    
-    % Indices of non-empty plasma species bins
-    iSpeciesVelo = iSpeciesRadius(iParticle);
-
-    %--------------------------------------------------------------------------
-    % Set number of traveled radial bins
-    %--------------------------------------------------------------------------
-
-    % Restrict number of traveled bins to the total number of
-    %   radial bins
-    if ( iRadius + iVelo - 1 ) > nRadius
-        nRadiusDelta = nRadius - iRadius;
-    else
-        nRadiusDelta = iVelo - 1;
-    end
-
-    %--------------------------------------------------------------------------
-    % Update non-colliding particles
-    %--------------------------------------------------------------------------
-    
-    % Remove non-colliding particles to new position
-    particleMatrix(iSpeciesVelo, iVelo, iRadius) = ...
-        particleMatrix(iSpeciesVelo, iVelo, iRadius) - nParticle;
-
-    % Add non-colliding particles to new position
-    particleMatrix(iSpeciesVelo, iVelo, iRadius + nRadiusDelta) = ...
-        particleMatrix(iSpeciesVelo, iVelo, iRadius + nRadiusDelta) + nParticle;
-
-    end % Velocity loop
-
-    end % Radius loop
-    
-end % If ismatrix
-
 end
 

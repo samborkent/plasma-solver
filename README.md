@@ -105,7 +105,6 @@ Validation
 * Formation energy of cubic spinel Li4Ti5O12 target
 
 # Differences with Wijnands's model
-* No smoothing between velocity bins each time step.
 * Background gas can have every velocity and can be completely modeled just
     like plasma species.
 * Using double matrices for all data instead of struct, which improves
@@ -115,6 +114,15 @@ Validation
 * Adjusted collision rate calculation, and included a velocity weight term.
 
 # Change log
+
+24-05-21:
+* Worked on making the code look nice
+* Rewrote initialVelocityDistribution
+
+21-05-21:
+* Worked on making the code pretty, efficient and user friendly.
+* Everything is working now btw. Oxidation is to be imlemented in the future, 
+    but data structure supports it.
 
 22-04-21:
 * Implemented number of collision separation

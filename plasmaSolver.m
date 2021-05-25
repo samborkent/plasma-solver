@@ -14,6 +14,38 @@
 %   velo    : Velocity
 %   uc      : Unit cell
 %
+% Species indexing:
+%
+%   No oxygen
+%   1       : Background gas molecule
+%   2       : 1st target component
+%   :       
+%   N       : Nth target component
+%
+%   Oxygen gas, no oxygen in target:
+%   1       : Background gas molecule
+%   2       : 1st target component
+%   3       : 2nd target component
+%   :
+%   N       : Nth target component
+%   N+1     : 1st target component, 1st oxide
+%   :
+%   N+O     : 1st target component, Oth oxide (given by nOxidePerElement)
+%   N+O+1   : 2nd target component, 1st oxide
+%   N+2O    : 2nd target component, Oth oxide
+%   :
+%   N+NO    : Nth target component, Oth oxide
+%
+%   Oxygen gas and oxygen in target:
+%   1       : Background gas molecule
+%   2       : Oxygen present in target
+%   3       : 1st non-oxygen target component
+%   4       : 2nd non-oxygen target component
+%   :
+%   N+1     : Nth non-oxygen target component
+%   :
+%   etc.      Continues same as situation with oxgen gas and no oxygen in target
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Initialization
@@ -47,6 +79,21 @@ UC  = UnitCells;            % Material properties
 % All user input goes here !!!
 
 %-------------------------------------------------------------------------------
+% File settings
+%-------------------------------------------------------------------------------
+
+% Output folder
+folder      = 'results';
+
+% File name of configuration file
+fileName    = 'config';
+
+% Add comment to configuration file
+commentString = [ ' ' ...
+    'Type your comment here.' ...
+    ];
+
+%-------------------------------------------------------------------------------
 % Preferences (true / false)
 %-------------------------------------------------------------------------------
 
@@ -59,13 +106,16 @@ debugBool = false;
 timerBool = true;
 
 % Create a configuration file containing simulation settings
-createConfigBool = false;
+createConfigBool = true;
 
 % Plot the initial velocity distribution
-plotInitVeloDistBool = false;
+plotInitVeloDistBool = true;
 
 % Save all figures
 saveFiguresBool = false;
+
+% Plot all angles (true) or just the centre of the plasma (false)
+plot2DBool = false;
 
 %-------------------------------------------------------------------------------
 % Computational restrictions
@@ -84,31 +134,23 @@ kMax = 1;
 %   * Signifiacnt impact on performance
 %   * Prevents quantization error
 %   * Conserves number of particles
-veloSmoothNonCollidedBool = true;
+veloSmoothNonColBool = true;
 
 % Switch velocity smoothing for collided particles on or off (true / false)
 %   * Less visible effect on results
 %   * Huge impact on performance
-veloSmoothAllBool = true;
+veloSmoothColBool = true;
 
 % Width of the Gaussian smoothing function for smoothing particle velocities
 %   * Default: 3 (corresponds to ~400 m/s with default resolution)
 smoothWidth = 3;
 
-%-------------------------------------------------------------------------------
-% File settings
-%-------------------------------------------------------------------------------
-
-% Output folder
-folder      = 'results';
-
-% File name of configuration file
-fileName    = 'config';
-
-% Add comment to configuration file
-commentString = [ ' ' ...
-    'Type your comment here.' ...
-    ];
+% Bound particles to the last radial bin, so the total number of particles is
+%   conserved, and particles don't dissappear after passing the last radial bin
+%   * Has a negative inpact on performance
+%   * Only enable to check the conservation of particles, other than that it has
+%       no physical advantage
+keepParticleBool = false;
 
 %-------------------------------------------------------------------------------
 % Dimensional limits
@@ -124,15 +166,15 @@ angleDelta  = 3;        % Angular step size ( Default: 3  )
 
 % Radial limits [m]
 radiusMax   = 0.05;     % Target-substrate distance ( Default: 0.05 )
-radiusDelta = 6E-5;     % Radial step size          ( Default: 6E-5 ) 
+radiusDelta = 2E-5;     % Radial step size          ( Default: 6E-5 ) 
 
 % Maximum velocity [m / s]
 %   * Increase if target contains atoms lighter than oxygen (e.g. lithium)
-%   * Default: 2.5E4
-veloMax = 2.5E4;
+%   * Default: 3E4
+veloMax = 3E4;
 
 %-------------------------------------------------------------------------------
-% Material settings
+% Material parameters
 %-------------------------------------------------------------------------------
 
 % Unit cell
@@ -140,12 +182,12 @@ veloMax = 2.5E4;
 %   * Any mixture of crystals is possible, eg. [UC.TiO2 UC.Li2O]
 %   * To add new materials or to view material propertie, see UnitCells.m
 %   Options: TiO2, SrTiO3, Li2O, LiO2, LiTi2O4, Li2TiO3, Li4Ti5O12
-uc = UC.TiO2;
+uc = [UC.TiO2 UC.Li2O];
 
 % Mixture ratio of species in target
 %   * Ignore if target contains only one component
 %   * Should be of same length as unit cell array
-ucRatio = [1 3];
+ucRatio = [1 2];
 
 % Target density [kg / m^3]
 %   * If set to 0, a perfect single crystal target is assumed
@@ -156,7 +198,24 @@ targetDensity = 0;
 % Ratio of laser energy that is absorbed by the target
 %   * Determine per target for most accurate results
 %   * Default: 0.6
-absorption = 0.6;
+absorbedRatio = 0.6;
+
+% The number of oxides that can form per element
+%   * Example: From a TiO2 target TiO and TiO2 can form during propagation,
+%       so nOxidesPerElement is 2.
+%   * Default: 2
+nOxidePerElement = 2;
+
+% Heat dissipating into the target per laser pulse [J]
+%   * Small for ceramic targets.
+%   * Can be approximated using specific heat equation if material
+%       properties are known
+%   * Default: 0
+heatTarget      = 0;
+
+% Excitation energy per atom in unit cell [J]
+%   * Default: 0
+energyExcitation = 0;
 
 %-------------------------------------------------------------------------------
 % Background gas parameters
@@ -164,6 +223,9 @@ absorption = 0.6;
 
 % Background gas molecule
 bg = [PT.O PT.O];
+
+% Background gas molecule mass [kg]
+massBG = sum([bg.MASS]);
 
 % Background gas pressure during depostion [Pa = 1E2 mbar]
 %   * Default: 0.01-0.2E2;
@@ -194,13 +256,6 @@ ablationDepth   = 100E-9;
 %   * Default: 2.0
 laserFluence    = 2.0;
 
-% Heat dissipating into the target per laser pulse [J]
-%   * Small for ceramic targets.
-%   * Can be approximated using specific heat equation if material
-%       properties are known
-%   * Default: 0
-heatTarget      = 0;
-
 %-------------------------------------------------------------------------------
 % Model parameters
 %-------------------------------------------------------------------------------
@@ -212,7 +267,7 @@ cosPowerFit = 25;
 
 % Initial velocity distribution width
 %   * Default: 1500
-initVeloDisWidth = 1500;
+initVeloDistWidth = 1500;
 
 %% Calculations
 % Everything below is calculated automatically based on user input above.
@@ -221,31 +276,118 @@ initVeloDisWidth = 1500;
 % Timer
 %-------------------------------------------------------------------------------
 
-if debugBool
+if timerBool
     % Time the entire script
     durationTotalTimer = tic;
 end
+
+% Initialize measured times
+%   * To prevent createConfigFile throwing an error.
+durationTotal = 0;
 
 %-------------------------------------------------------------------------------
 % Material calculations
 %-------------------------------------------------------------------------------
 
-% Number of elements in target
-nElements = numel(uc.ELEMENTS);
+% % Number of elements in target
+% nElements = numel(uc.ELEMENTS);
+
+% If target consists of only one unit cell
+if numel(uc) == 1
+    % Set mixture ratio to 1
+	ucRatio = 1;
+    
+    % Single crystal density
+    scDensity = uc.DENSITY;
+    
+    % Unit cell volume
+    ucVolume = uc.VOLUME;
+else
+    % Normalize unit cell ratio
+    ucRatio = ucRatio / sum(ucRatio);
+    
+    % Weighted average single crystal density
+    scDensity = sum(([uc.DENSITY] .* ucRatio) ./ sum(ucRatio));
+    
+    % Weighted average unit cell volume
+    ucVolume = sum(([uc.VOLUME] .* ucRatio) ./ sum(ucRatio));
+end
+
+% Check if the number of given materials in target is the same as the
+%   number of elements in the mixture ratio array
+if numel(uc) ~= numel(ucRatio)
+    error([ 'Number of elements of mixture ratio array must be the ' ...
+            'same as the unit cell array.' ]);
+end
+
+% If target is single crystal
+if targetDensity == 0
+    % Density ratio is 1
+    densityRatio = 1;
+else
+    % Density ratio is given by ratio between measured and weighted
+    %   single crystal density
+    densiyRatio = targetDensity / scDenstity;
+    
+    % If density ratio somehow exceeds 1, throw error
+    if densityRatio > 1
+        error('Density ratio greater than 1.');
+    end
+end
+
+% Get unique elements in target and their normalized amounts
+[atomUC, nAtomUC] = getUniqueElements(uc, ucRatio);
+
+% Number of possible species
+nSpecies = calculateNSpecies(atomUC, bg, nOxidePerElement);
+
+% Get particle masses
+mass = [sum([bg.MASS]) atomUC.MASS];
+
+% Get metals present in target
+metalUC = atomUC([atomUC.NUMBER] ~= 8);
+
+% If a non-oxygen element is present in the target and there is oxygen
+%   present in the background gas
+if (numel(metalUC) > 1) && sum([bg.NUMBER] == 8)
+    % Add oxides to mass array
+    %   * Assumes oxides of form MO, MO2, MO3, etc.
+    %   * This is only correct for some material, if a material forms
+    %       different types of oxides it has to be added manually (e.g. Li2O)
+    for iOxide = 1 : nOxidePerElement
+        mass = [ mass ([metalUC.MASS] + iOxide*PT.O.MASS) ];
+    end
+end
+
+% Get radii of plasma species
+colCS = [atomUC.RADIUS];
+
+if (numel(metalUC) > 1) && sum([bg.NUMBER] == 8)
+    % Add radii of oxides
+    %   * Assumes oxides of form MO, MO2, MO3, etc.
+    %   * This is only correct for some material, if a material forms
+    %       different types of oxides it has to be added manually (e.g. Li2O)
+    for iOxide = 1 : nOxidePerElement
+        colCS = [ colCS ([metalUC.RADIUS] + iOxide*PT.O.RADIUS) ];
+    end
+end
+
+% Calculate collisions cross-sections
+colCS = pi .* (sum([bg.RADIUS]) + colCS) .^2;
 
 %-------------------------------------------------------------------------------
-% Deposition parameter calculations
+% Background gas parameter calculations
 %-------------------------------------------------------------------------------
 
 % Background gas density (ideal gas law) [m^-3]
 bgDensity = bgPressure / (C.BOLTZMANN * bgTemperature);
 
-% Ablation volume [m^3]
-ablationVolume  = spotWidth * spotHeight * ablationDepth;
-
 %-------------------------------------------------------------------------------
 % Laser parameter calculations
 %-------------------------------------------------------------------------------
+
+% Ablation volume [m^3]
+ablationVolume  = spotWidth * spotHeight * ablationDepth;
 
 % Laser energy [J]
 energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
@@ -255,10 +397,10 @@ energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
 %-------------------------------------------------------------------------------
 
 % Number of ablated unit cells
-nUCAblated = ablationVolume / uc.VOLUME;
+nUCAblated = ablationVolume ./ [uc.VOLUME];
 
 % Number of ablated atoms
-nAtomAblated = nUCAblated * sum(uc.AMOUNT);
+nAtomAblated = (ablationVolume / ucVolume) .* nAtomUC;
 
 %% Axis creation
 
@@ -268,7 +410,13 @@ nTime   = numel(time);
 
 % Angular axis
 angle   = 0 : angleDelta : angleMax - angleDelta;
-nAngle  = numel(angle);
+
+% Set number of angles
+if plot2DBool
+    nAngle  = numel(angle);
+else
+    nAngle = 1;
+end
 
 % Radial axis
 radius  = 0 : radiusDelta : radiusMax - radiusDelta;
@@ -279,65 +427,50 @@ veloDelta   = radiusDelta / timeDelta;
 velo        = 0 : veloDelta : veloMax - veloDelta;
 nVelo       = numel(velo);
 
-%% Create config file
-
-if createConfigBool
-    createConfigFile(currentPath, folder, fileName, commentString, ...
-        time, radius, angle)
-end
-
 %% Pre-allocations
 
-% Total number of possible species
-%   * 1 for background gas, nElements for elements in target, 
-%     2*(nElements - 1) for oxides, assuming unit cell
-
-% If there is oxygen in the target and in the background gas
-if sum([uc.ELEMENTS.NUMBER] == 8) && sum([bg.NUMBER] == 8)
-    nSpecies = 1 + nElements + 2*(nElements - 1);
-% If there is only oxygen in the background gas
-elseif sum([bg.NUMBER] == 8)
-    nSpecies = 1 + nElements + 2*nElements;
-% If no oxygen is present
-else
-    nSpecies = 1 + nElements;
-end
-
-% Plasma particle matrix
-timer0 = tic;
-% plasmaMatrix = zeros(kMax+1, nSpecies, nVelo, nRadius);
+% Particle matrix 
 particleMatrix = zeros(nSpecies, kMax+1, nVelo, nRadius);
-% plasmaSub = plasmaMatrix.*0;
-collisionMatrix = zeros(nSpecies, 1, nVelo, nRadius);
-collisionRate = zeros(nSpecies-1, 1, nVelo, nRadius);
-time0 = toc(timer0);
 
-return
+% Matrix holding new positions of collided particles
+%   * Reset every time step
+collisionMatrix = zeros(nSpecies, 1, nVelo, nRadius);
+
+% Matrix holding all collision rates
+%   * Calculated every time step
+%   * Prevents having to calculate the collision rate millions of times when
+%       when called, instead calculate the collision rate for every position at
+%       once each time step
+collisionRate = zeros(nSpecies-1, 1, nVelo, nRadius);
+
+% Matrices holding indices of new velocity of particles after collision
+iNewVeloMatrix = zeros(nVelo, nSpecies-1, nVelo);   % Plasma particles
+iNewVeloBGMatrix = zeros(nVelo, nSpecies-1, nVelo); % Background gas particles
 
 %% Pre-calculations
 
-sigma = zeros(nSpecies-1, 1);
-mass = zeros(nSpecies-1, 1);
-
-sigma(1:4)   = pi .* ( 2*PT.O.RADIUS + [PT.Ti.RADIUS; PT.O.RADIUS; PT.Ti.RADIUS+PT.O.RADIUS; PT.Ti.RADIUS+2*PT.O.RADIUS] ).^2;
-mass(1:4)    = [PT.Ti.MASS PT.O.MASS PT.Ti.MASS+PT.O.MASS PT.Ti.MASS+2*PT.O.MASS];
-massBG  = 2*PT.O.MASS;
-
-% Matrix containing all possible velocity weights
+% Matrix containing all possible velocity weights for collision calculation
+%   * Prevents having to calculate many times, instead just look up value
+%       from matrix
 veloWeight = (velo' - velo) ./ (velo' + velo);
 
-iNewVeloMatrix = zeros(nVelo, nElements, nVelo);
-iNewVeloBGMatrix = zeros(nVelo, nElements, nVelo);
-
-for iSpecies = 1 : 4 % nSpecies-1
-    iNewVeloMatrix(:, iSpecies, :) = round( (velo'.*(mass(iSpecies) - massBG) ...
-        + 2*massBG.*velo) ./ (mass(iSpecies) + massBG) ./ veloDelta );
+% Loop through plasma species
+for iSpecies = 2 : nSpecies
+    % Calculate new velocity of plasma species after collision with a
+    %   background gas particle
+    iNewVeloMatrix(:, iSpecies, :) = round( (velo'.*(mass(iSpecies) - mass(1)) ...
+        + 2*mass(1).*velo) ./ (mass(iSpecies) + mass(1)) ./ veloDelta );
     
-    iNewVeloBGMatrix(:, iSpecies, :) = round( (velo'.*(massBG - mass(iSpecies)) ...
-        + 2*mass(iSpecies).*velo) ./ (mass(iSpecies) + massBG) ./ veloDelta );
+    % Calculate new velocity of background gas particle after collision with
+    %   plasma species
+    iNewVeloBGMatrix(:, iSpecies, :) = round( (velo'.*(mass(1) - mass(iSpecies)) ...
+        + 2*mass(iSpecies).*velo) ./ (mass(iSpecies) + mass(1)) ./ veloDelta );
 end
 
-% Prevent index out-of-range error
+% Prevent index out-of-bounds error
+%   * Particles are not allowed to move backwards, so every velocity below zero
+%       is set to zero
+%   * Particles cannot exceed maximum velocity
 iNewVeloMatrix(iNewVeloMatrix < 1) = 1;
 iNewVeloBGMatrix(iNewVeloBGMatrix < 1) = 1;
 iNewVeloMatrix(iNewVeloMatrix > nVelo) = nVelo;
@@ -347,38 +480,51 @@ iNewVeloBGMatrix(iNewVeloBGMatrix > nVelo) = nVelo;
 nParticleAngle = angularDistribution( angle,        ...
                                       radiusDelta,  ...
                                       cosPowerFit,  ...
-                                      nAtomAblated );
+                                      sum(nAtomAblated) );
 
 %% Main program
+
+for iAngle = 1 : nAngle
+%% Calculations per angle
+
+% Skip angle if there are not enough particles present
+if nParticleAngle(iAngle) < nMin
+    continue
+end
+
+% Reset particle matrix
+if iAngle > 1
+    particleMatrix = particleMatrix.*0;
+end
 
 % Pre-allocate background gas particle matrix and fill matrix based on
 %   calculated density, also retrieve bin volumes per radial bin
 [particleMatrix(1, 1, 1, :), binVolume] = fillBGMatrix( bgDensity,    ...
-                                                     radius,       ...
-                                                     angle,        ...
-                                                     1,            ...
-                                                     radiusDelta );
+                                                        radius,       ...
+                                                        angle,        ...
+                                                        iAngle,       ...
+                                                        radiusDelta );
                                         
-% % Total number of background particles at this angle
-% nBGTotal = sum( particleMatrix(1, 1, 1, :) );
-% 
-% % Total number of plasma particles at this angle
-% nPlasmaTotal = nParticleAngle(1) ./ [uc.AMOUNT];
+% Total number of background particles at this angle
+nBGTotal = sum( particleMatrix(1, 1, 1, :) );
+
+% Total number of plasma particles at this angle
+nPlasmaTotal = nParticleAngle(iAngle);
 
 % Calculate the initial particle velocity distribution
-[nParticleVeloInit, veloPlasma] = initialVelocityDistribution(          ...
-                                               plotInitVeloDistBool,          ...
-                                               saveFiguresBool,          ...
-                                               velo,                    ...
-                                               initVeloDisWidth,        ...
-                                               nUCAblated,              ...
-                                               uc,                      ...
-                                               1,                       ...
-                                               energyLaser,             ...
-                                               heatTarget,              ...
-                                               absorption,              ...
-                                               nParticleAngle(1),       ...
-                                               1 );
+nParticleVeloInit = initialVelocityDistribution( uc,                ...
+                                                 ucRatio,           ...
+                                                 atomUC,            ...
+                                                 ablationVolume,    ...
+                                                 velo,              ...
+                                                 initVeloDistWidth, ...
+                                                 absorbedRatio,     ...
+                                                 energyLaser,       ...
+                                                 heatTarget,        ...
+                                                 energyExcitation,  ...
+                                                 plotInitVeloDistBool );
+
+return                                           
 
 % Fill into the plasma matrix
 particleMatrix(2:3, 1, :, 1) = reshape(nParticleVeloInit(:, 1:2)', nElements, 1, nVelo, 1);
@@ -393,7 +539,7 @@ plotArray = {'Uncollided', 'Collided', 'Total'};
 
 plotIndex = 0;
 
-for iTime = 1 : 62 % nTime
+for iTime = 1 : 1 % nTime
 %% Calculations per time step
 
 % Reset collision matrix
@@ -402,12 +548,18 @@ collisionMatrix = collisionMatrix.*0;
 % Total number of particles
 particleTotal = sum( particleMatrix, 'all' );
 
-% if iTime > 1
-% %     % Smooth velocities of non-collided particles
-% %     particleMatrix(:, 1, 2:end, :) = smoothdata( particleMatrix(:, 1, 2:end, :), 3, 'gaussian', smoothWidth );
-%     % Smooth velocities
-%     particleMatrix(:, :, 2:end, :) = smoothdata( particleMatrix(:, :, 2:end, :), 3, 'gaussian', smoothWidth );
-% end
+% Skip first time step for smoothing
+if iTime > 1
+    if veloSmoothNonColBool
+        % Smooth velocities of non-collided particles
+        particleMatrix(:, 1, 2:end, :) = smoothdata( particleMatrix(:, 1, 2:end, :), 3, 'gaussian', smoothWidth );
+    end
+    
+    if veloSmoothColBool
+        % Smooth velocities of collided particles
+        particleMatrix(:, 2:end, 2:end, :) = smoothdata( particleMatrix(:, 2:end, 2:end, :), 3, 'gaussian', smoothWidth );
+    end
+end
 
 % Remove all particles below threshold
 particleMatrix(particleMatrix < nMin) = 0;
@@ -417,7 +569,7 @@ particleMatrix = ( particleMatrix ./ sum(particleMatrix, 'all') ) .* particleTot
 
 % Calculate collision rate matrix
 collisionRate = ( sum(particleMatrix(1, :, :, :), 2) ./ reshape(binVolume, 1, 1, 1, nRadius) ) ...
-                .* radiusDelta .* sigma;
+                .* radiusDelta .* colCS;
 
 timerA = tic;
 for iRadius = (nRadius - 1) : -1 : 1
@@ -557,7 +709,8 @@ end % Radius loop
 timeA = toc(timerA);
 
 timerB = tic;
-particleMatrix = alternativeUpdate(particleMatrix, nVelo, nSpecies, kMax+1);
+particleMatrix = updateMatrix(particleMatrix, nVelo, nSpecies, kMax+1, ...
+                                keepParticleBool );
 
 particleMatrix(:, 2, :, :) = particleMatrix(:, 2, :, :) + collisionMatrix;
 timeB = toc(timerB);
@@ -633,13 +786,13 @@ if (iTime ==  6) || (iTime == 11) || (iTime == 21) || (iTime == 31) || (iTime ==
         figure(3+iSpecies);
         subplot(1, 2, 1);
         hold on;
-        for i = 1 : nRadius
-            veloMeanSquared(i) = sum(reshape(sum(particleMatrix(iSpecies, :, :, i), 2), 1, nVelo) .* (velo.^2)) / sum(particleMatrix(iSpecies, :, :, i), 'all');
+        for iAtom = 1 : nRadius
+            veloMeanSquared(iAtom) = sum(reshape(sum(particleMatrix(iSpecies, :, :, iAtom), 2), 1, nVelo) .* (velo.^2)) / sum(particleMatrix(iSpecies, :, :, iAtom), 'all');
             
             if iSpecies == 1
-                tempMean(i) = (massBG * veloMeanSquared(i)) / (3 * C.BOLTZMANN);
+                tempMean(iAtom) = (massBG * veloMeanSquared(iAtom)) / (3 * C.BOLTZMANN);
             else
-                tempMean(i) = (mass(iSpecies) * veloMeanSquared(i)) / (3 * C.BOLTZMANN);
+                tempMean(iAtom) = (mass(iSpecies) * veloMeanSquared(iAtom)) / (3 * C.BOLTZMANN);
             end
         end
         plot( radius, sqrt(veloMeanSquared), ...
@@ -656,32 +809,21 @@ end
 
 end % Time loop
 
+end % Angle loop
+
 durationTotal = toc(durationTotalTimer);
 
-function matrix = alternativeUpdate(matrix, nVelo, nSpecies, kMax)
-    for iVelo = nVelo : -1 : 2
-%         matrix(:, :, iVelo, end-iVelo+1) = ...
-%             sum( matrix(:, :, iVelo, end-iVelo+1:end), 'all' );
-        matrix(:, :, iVelo, iVelo:end) = matrix(:, :, iVelo, 1:end-iVelo+1);
-        matrix(:, :, iVelo, 1:iVelo-1) = zeros(nSpecies, kMax+1, 1, iVelo-1);
-    end
-end
+%% Create config file
 
-function matrix = quickUpdate(matrix, nVelo, nRadius, nMin)
-    for iRadius = nRadius - 1 : -1 : 1   
-        for iVelo = nVelo : -1 : 2
-            if matrix(iVelo, iRadius) > nMin
-                if (iRadius + iVelo - 1) > nRadius
-                    nRadiusTraveled = nRadius - iRadius;
-                else
-                    nRadiusTraveled = iVelo - 1;
-                end
-            
-                matrix(iVelo, iRadius + nRadiusTraveled) = ...
-                    matrix(iVelo, iRadius + nRadiusTraveled) ...
-                    + matrix(iVelo, iRadius);
-                matrix(iVelo, iRadius) = 0;
-            end
-        end
-    end
+if createConfigBool
+    createConfigFile(currentPath, folder, fileName, commentString, ...          % File settings
+        saveFiguresBool, plot2DBool, ...                                        % Preferences
+        nMin, kMax, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
+        time, angle, radius, velo, ...                                          % Dimensional limits
+        uc, ucRatio, targetDensity, absorption, ...                             % Material parameters
+        bg, bgPressure, bgTemperature, bgDensity, ...                           % Background gas parameters
+        spotWidth, spotHeight, ablationDepth, ablationVolume, laserFluence, energyLaser, heatTarget, ... % Laser parameters
+        cosPowerFit, initVeloDistWidth, ...                                      % Model parameters
+        nPlasmaTotal, nBGTotal, ...                                             % Number of particles
+        durationTotal );                                                        % Timers                          
 end
