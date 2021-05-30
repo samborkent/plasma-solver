@@ -7,15 +7,15 @@ smoothValue = 10;
 
 % Remove first and last points to prevent the curve from sloping up at the
 %   limits
-x([1 end]) = 0;
-y([1 end]) = 0;
+% x([1 end]) = 0;
+% y([1 end]) = 0;
 
 % Only data points above threshold
 xTemp = x(y > yThreshold);
 yTemp = y(y > yThreshold);
 
 % At least 6 points are required to fit a gaussian curve
-if numel(y) > 6
+if numel(yTemp) > 6
     % Fit a Gaussian curve
     fitGauss = fit( xTemp.', yTemp.', 'gauss2' );
 
@@ -34,6 +34,7 @@ if numel(y) > 6
     % Normalize
     curveGauss = curveGauss ./ sum(curveGauss);
 else
+    % Otherwise return non-fitted data
     curveGauss = y;
 end
 

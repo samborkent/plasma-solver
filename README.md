@@ -115,6 +115,11 @@ Validation
 
 # Change log
 
+30-5-21:
+* Improved updateMatrix to support negative matrix and use circshift
+* Replaced normal initial velocity distribution for a log- normal distribution,
+    so particles cannot have zero-velocity directly after ablation.
+
 24-05-21:
 * Worked on making the code look nice
 * Rewrote initialVelocityDistribution
