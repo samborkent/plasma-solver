@@ -1,6 +1,7 @@
 function nParticleVeloDist = initialVelocityDistribution( ...
     uc, ucRatio, atomUC, ablationVolume, velo, initVeloDistWidth, ...
-    absorbedRatio, energyLaser, heatTarget, energyExcitation, plotInitVeloDistBool )
+    absorbedRatio, energyLaser, heatTarget, energyExcitation, ...
+    plotInitVeloDistBool, nMin, nParticleTotal )
 % function [nParticleVeloInit, velocityAverage] = initialVelocityDistribution( ...
 %     plotBool, saveBool, velo, velDisWidth, nUCAblated, uc, ucRatio, ...
 %     energyLaser, heatTarget, absorption, nParticleAngle, densityRatio )
@@ -18,6 +19,9 @@ for iUC = 1 : numel(uc)
     energyKinetic = ( (absorbedRatio * energyLaser - heatTarget) ...
                       / ( nUCAblated(iUC) * sum(uc(iUC).AMOUNT) ) ) ...
                     - energyExcitation - uc(iUC).ENERGY_FORMATION;
+%     energyKinetic = ( ((energyLaser / absorbedRatio) - heatTarget) ...
+%                       / ( nUCAblated(iUC) * sum(uc(iUC).AMOUNT) ) ) ...
+%                     - energyExcitation - uc(iUC).ENERGY_FORMATION;
     
     % Loop through the elements in the unit cell
     for iElement = 1 : numel(uc(iUC).AMOUNT)
@@ -25,32 +29,52 @@ for iUC = 1 : numel(uc)
         elementIndex = find(uc(iUC).ELEMENTS(iElement).NUMBER == [atomUC.NUMBER]);
         
         % Calculate the average velocity of each element in the unit cell
-        veloAverage = sqrt( 2 * energyKinetic / uc(iUC).ELEMENTS(iElement).MASS);
+%         veloRMS = sqrt( 2 * energyKinetic / uc(iUC).ELEMENTS(iElement).MASS );
+%         veloAverage = sqrt( 2 * energyKinetic / ( uc(iUC).ELEMENTS(iElement).MASS * uc(iUC).AMOUNT(iElement) ));
         
-        % Log-normal distribution mean
-        mu = log( veloAverage^2 / sqrt(veloAverage^2 + initVeloDistWidth^2) );
-        
-        % Log-normal distribution variance
-        sigma = sqrt( log( 1 + (initVeloDistWidth^2 / veloAverage^2) ) );
+%         % Log-normal distribution mean
+%         mu = log( veloRMS^2 / sqrt(veloRMS^2 + initVeloDistWidth^2) );
+%         
+%         % Log-normal distribution variance
+%         sigma = sqrt( log( 1 + (initVeloDistWidth^2 / veloRMS^2) ) );
         
         % Initial particle velocity log- normal distribution
-%         veloDistTemp = exp(- (velo - veloAverage).^2 ./ (2 * initVeloDistWidth^2) ) ...
+        % Gaussian
+%         veloDistTemp = exp(- (velo - veloRMS).^2 ./ (2 * initVeloDistWidth^2) ) ...
 %                             ./ ( sqrt(2*pi) * initVeloDistWidth );
-        veloDistTemp = exp( -( log(velo(2:end)) - mu ).^2 ./ (2 * sigma^2) ) ...
-            ./ ( velo(2:end) .* (sqrt(2*pi) * sigma) );
+        % Log-normal
+%         veloDistTemp = exp( -( log(velo(2:end)) - mu ).^2 ./ (2 * sigma^2) ) ...
+%             ./ ( velo(2:end) .* (sqrt(2*pi) * sigma) );
+        % Maxwellian
+%         veloDistTemp = velo.^2 .* exp(- (3.*(velo.^2)) ./ (2 * e) );
+        veloDistTemp = ...
+            velo.^2 .* exp(- ( (3*uc(iUC).ELEMENTS(iElement).MASS).*(velo.^2) ) ...
+                               ./ (4 * energyKinetic) );
                         
         % Normalize by the number of ablated particles
+%         veloDistTemp = ( veloDistTemp ./ sum(veloDistTemp) ) ...
+%                .* uc(iUC).AMOUNT(iElement);
         veloDistTemp = ( veloDistTemp ./ sum(veloDistTemp) ) ...
                        .* ( nUCAblated(iUC) * uc(iUC).AMOUNT(iElement) );
+%         veloDistTemp = ( veloDistTemp ./ sum(veloDistTemp) ) ...
+%                        .* ( nUCAblated(iUC) * uc(iUC).AMOUNT(iElement) / sum([uc(iUC).AMOUNT]) );
         
         % Add distribution to element
-        nParticleVeloDist(elementIndex, 2:end) = ...
-            nParticleVeloDist(elementIndex, 2:end) + veloDistTemp;
+%         nParticleVeloDist(elementIndex, 2:end) = ...
+%             nParticleVeloDist(elementIndex, 2:end) + veloDistTemp;
+        nParticleVeloDist(elementIndex, :) = ...
+            nParticleVeloDist(elementIndex, :) + veloDistTemp;
     end
 end
 
+nParticleVeloDist = ( nParticleVeloDist ./ sum(nParticleVeloDist, 'all') ) ...
+                    .* nParticleTotal;
+
 % If plotting is enabled
 if plotInitVeloDistBool
+    
+    % Maximum required velocity
+    iVeloMax = find( any(nParticleVeloDist > nMin, 1) , 1, 'last');
     
     % String for material formula
     formulaString = [];
@@ -98,6 +122,7 @@ if plotInitVeloDistBool
     
     % Enable legend
     legend;
+    xlim([0 velo(iVeloMax)]);
 end
 
 % % Make plot

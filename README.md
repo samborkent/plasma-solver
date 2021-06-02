@@ -115,6 +115,9 @@ Validation
 
 # Change log
 
+01-06-21:
+* Replaced log-normal distribution for Maxwell-Boltzmann distribution.
+
 30-5-21:
 * Improved updateMatrix to support negative matrix and use circshift
 * Replaced normal initial velocity distribution for a log- normal distribution,
