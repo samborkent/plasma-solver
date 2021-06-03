@@ -29,7 +29,7 @@ for iUC = 1 : numel(uc)
         elementIndex = find(uc(iUC).ELEMENTS(iElement).NUMBER == [atomUC.NUMBER]);
         
         % Calculate the average velocity of each element in the unit cell
-%         veloRMS = sqrt( 2 * energyKinetic / uc(iUC).ELEMENTS(iElement).MASS );
+        veloRMS = sqrt( 2 * energyKinetic / uc(iUC).ELEMENTS(iElement).MASS );
 %         veloAverage = sqrt( 2 * energyKinetic / ( uc(iUC).ELEMENTS(iElement).MASS * uc(iUC).AMOUNT(iElement) ));
         
 %         % Log-normal distribution mean
@@ -40,16 +40,16 @@ for iUC = 1 : numel(uc)
         
         % Initial particle velocity log- normal distribution
         % Gaussian
-%         veloDistTemp = exp(- (velo - veloRMS).^2 ./ (2 * initVeloDistWidth^2) ) ...
-%                             ./ ( sqrt(2*pi) * initVeloDistWidth );
+        veloDistTemp = exp(- (velo - veloRMS).^2 ./ (2 * initVeloDistWidth^2) ) ...
+                            ./ ( sqrt(2*pi) * initVeloDistWidth );
         % Log-normal
 %         veloDistTemp = exp( -( log(velo(2:end)) - mu ).^2 ./ (2 * sigma^2) ) ...
 %             ./ ( velo(2:end) .* (sqrt(2*pi) * sigma) );
         % Maxwellian
 %         veloDistTemp = velo.^2 .* exp(- (3.*(velo.^2)) ./ (2 * e) );
-        veloDistTemp = ...
-            velo.^2 .* exp(- ( (3*uc(iUC).ELEMENTS(iElement).MASS).*(velo.^2) ) ...
-                               ./ (4 * energyKinetic) );
+%         veloDistTemp = ...
+%             velo.^2 .* exp(- ( (3*uc(iUC).ELEMENTS(iElement).MASS).*(velo.^2) ) ...
+%                                ./ (4 * energyKinetic) );
                         
         % Normalize by the number of ablated particles
 %         veloDistTemp = ( veloDistTemp ./ sum(veloDistTemp) ) ...

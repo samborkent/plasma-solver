@@ -124,8 +124,8 @@ plot2DBool = false;
 % Minimal number of particles per bin
 %   * Best way to increase performance, increasing the value to much will
 %     result in nonsensical results.
-nMin = 1E9;
-nMinBG = 1;
+nMin = 1E6;
+nMinBG = 1E3;
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
@@ -158,10 +158,10 @@ keepParticleBool = false;
 %-------------------------------------------------------------------------------
 
 % Indices of times to plot
-plotTimes = [6 16 31 51 81 101];
+plotTimes = [6 16 31 51 81 101 181];
 
 % Temporal limits [s]
-timeMax     = 11E-6;     % Simulation run time ( Default: 5-20E-6 )
+timeMax     = 18E-6;     % Simulation run time ( Default: 5-20E-6 )
 timeDelta   = 1E-7;     % Time step duration  ( Default: 1E-7    )
 
 % Angular limits [deg]
@@ -169,8 +169,8 @@ angleMax    = 90;       % End angle         ( Default: 90 )
 angleDelta  = 3;        % Angular step size ( Default: 3  )
 
 % Radial limits [m]
-radiusMax   = 0.05;     % Target-substrate distance ( Default: 0.05 )
-radiusDelta = 2E-5;     % Radial step size          ( Default: 6E-5 ) 
+radiusMax   = 0.06;     % Target-substrate distance ( Default: 0.05 )
+radiusDelta = 5E-5;     % Radial step size          ( Default: 6E-5 ) 
 
 % Maximum velocity [m / s]
 %   * Increase if target contains atoms lighter than oxygen (e.g. lithium)
@@ -406,6 +406,20 @@ energyLaser = 0.0299;
 nAtomAblated = (ablationVolume / ucVolume) .* nAtomUC .* densityRatio;
 
 %-------------------------------------------------------------------------------
+% Axis creation
+%-------------------------------------------------------------------------------
+
+% Temporal axis
+time    = 0 : timeDelta : timeMax - timeDelta;
+nTime   = numel(time);
+executionTime = zeros(1, nTime);
+
+% Radial axis
+radius  = 0 : radiusDelta : radiusMax - radiusDelta;
+nRadius = numel(radius);
+iRadiusRange = 1 : nRadius;
+
+%-------------------------------------------------------------------------------
 % Angular distribution
 %-------------------------------------------------------------------------------
 
@@ -420,10 +434,11 @@ else
 end
 
 % Angular plasma particle distribution
-nParticleAngle = angularDistribution( angle,        ...
-                                      angleDelta,  ...
-                                      cosPowerFit,  ...
-                                      sum(nAtomAblated) );
+nPlasmaAngle = angularDistribution( angle,        ...
+                                    angleDelta,   ...
+                                    radiusDelta,  ...
+                                    cosPowerFit,  ...
+                                    sum(nAtomAblated) );
                                   
 %-------------------------------------------------------------------------------
 % Initial plasma particle velocity distribution
@@ -448,7 +463,7 @@ nParticleVeloInit = initialVelocityDistribution( uc,                    ...
                                                  energyExcitation,      ...
                                                  plotInitVeloDistBool,  ...
                                                  nMin,                  ...
-                                                 nParticleAngle(1) );
+                                                 nPlasmaAngle(1) );
 
 % Maximum required velocity
 iVeloMax = find( any(nParticleVeloInit > nMin, 1) , 1, 'last');
@@ -459,17 +474,6 @@ nVelo = numel(velo);
 iVeloZero   = round(nVelo / 2);
 iVeloRange  = 1 : nVelo;
 iVeloRangeInverted = nVelo : -1 : 1;
-                                             
-%% Axis creation
-
-% Temporal axis
-time    = 0 : timeDelta : timeMax - timeDelta;
-nTime   = numel(time);
-
-% Radial axis
-radius  = 0 : radiusDelta : radiusMax - radiusDelta;
-nRadius = numel(radius);
-iRadiusRange = 1 : nRadius;
 
 %% Pre-allocations
 
@@ -549,7 +553,7 @@ for iAngle = 1 : nAngle
 %% Calculations per angle
 
 % Skip angle if there are not enough particles present
-if nParticleAngle(iAngle) < nMin
+if nPlasmaAngle(iAngle) < nMin
     continue
 end
 
@@ -576,7 +580,7 @@ end
 nBGTotal = sum( particleMatrix(1, 1, iVeloZero, :) );
 
 % Total number of plasma particles at this angle
-nPlasmaTotal = nParticleAngle(iAngle);
+nPlasmaTotal = nPlasmaAngle(iAngle);
 
 % Fill into the plasma matrix
 % particleMatrix(2:nElements+1, 1, :, 1) = ...
@@ -944,6 +948,9 @@ end
 
 % Show time
 disp(['Simulation time: ' num2str(time(iTime)) ' s (Execution time: ' num2str(toc(durationTotalTimer)) ' s)']);
+
+% Save execution time
+executionTime(iTime) = toc(durationTotalTimer);
 
 end % Time loop
 
