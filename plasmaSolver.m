@@ -124,7 +124,7 @@ plot2DBool = false;
 % Minimal number of particles per bin
 %   * Best way to increase performance, increasing the value to much will
 %     result in nonsensical results.
-nMin = 1E6;
+nMin = 1E9;
 nMinBG = 1;
 
 % Maximum number of collisions
@@ -567,7 +567,10 @@ end
 %                                                         radiusDelta );
 [particleMatrix(1, 1, iVeloZero, :), binVolume] = fillBGMatrix( bgDensity,   ...
                                                                 radius,      ...
-                                                                angleDelta );
+                                                                radiusDelta, ...
+                                                                angle,       ...
+                                                                angleDelta,  ...
+                                                                iAngle );
 
 % Total number of background particles at this angle
 nBGTotal = sum( particleMatrix(1, 1, iVeloZero, :) );
@@ -618,8 +621,10 @@ end
 
 % Remove all particles below threshold
 % particleMatrix(particleMatrix < nMin) = 0;
-particleMatrix(particleMatrix(1, :, :, :) < nMinBG) = 0;
-particleMatrix(particleMatrix(2:end, :, :, :) < nMin) = 0;
+particleMatrix(particleMatrix < nMinBG) = 0;
+tempMatrix = particleMatrix(2:end, :, :, :);
+tempMatrix(tempMatrix < nMin) = 0;
+particleMatrix(2:end, :, :, :) = tempMatrix;
 
 % Normalize number of particles and add removed particles back to filled bins
 % particleMatrix = ( particleMatrix ./ sum(particleMatrix, 'all') ) .* particleTotal;
