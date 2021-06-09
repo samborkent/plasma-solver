@@ -100,10 +100,8 @@ commentString = [ ' ' ...
 % Enable / disable debug mode
 %   * Checks conservation of number of particles
 %   * Checks for negative number of particles
+%   * Reduces performance
 debugBool = true;
-
-% Enable / disable timers to measure code performance
-timerBool = true;
 
 % Create a configuration file containing simulation settings
 createConfigBool = false;
@@ -111,10 +109,15 @@ createConfigBool = false;
 % Plot the initial velocity distribution
 plotInitVeloDistBool = true;
 
-% Save all figures
-saveFiguresBool = false;
+% Plot density plot for background gas particles instead of number of particles
+plotDensityBool = false;
+
+% Plot figures in log scale
+plotLogBool = false;
 
 % Plot all angles (true) or just the centre of the plasma (false)
+%   * Calculation for all angles is supported, but 2D plots have not been
+%       implemented yet.
 plot2DBool = false;
 
 %-------------------------------------------------------------------------------
@@ -122,25 +125,27 @@ plot2DBool = false;
 %-------------------------------------------------------------------------------
 
 % Minimal number of particles per bin
-%   * Best way to increase performance, increasing the value to much will
-%     result in nonsensical results.
-% nMin      = 1E6;     % Plasma threshold
-% nMinBG    = 1E3;   % Background gas threshold
-nMin    = 4E6;     % Plasma threshold
-nMinBG  = 1E6;   % Background gas threshold
+%   * Best way to improve performance
+%   * Increases quantization error and visible noise in results
+nMin    = 1E6;     % Plasma threshold
+nMinBG  = 1E3;     % Background gas threshold
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
+%   * Separating the plots into more different number of collisions is
+%       supported, but not implemented at this moment.
 kMax = 1;
 
 % Allow negative velocities
+%   * Huge performance impact
+%   * Should be optimized to improve performance
 negativeVeloBool = false;
 
 % Switch velocity smoothing for non-collided particles on or off (true / false)
 %   * Signifiacnt impact on performance
 %   * Reduces quantization error
 %   * Conserves number of particles
-veloSmoothNonColBool = true;
+veloSmoothNonColBool = false;
 
 % Switch velocity smoothing for collided particles on or off (true / false)
 %   * Less visible effect on results
@@ -174,13 +179,8 @@ angleMax    = 90;       % End angle         ( Default: 90 )
 angleDelta  = 3;        % Angular step size ( Default: 3  )
 
 % Radial limits [m]
-radiusMax   = 0.06;     % Target-substrate distance ( Default: 0.05 )
-radiusDelta = 6E-5;     % Radial step size          ( Default: 6E-5 ) 
-
-% Maximum velocity [m / s]
-%   * Increase if target contains atoms lighter than oxygen (e.g. lithium)
-%   * Default: 3E4
-veloMaxInit = 10E4;
+radiusMax   = 0.05;     % Target-substrate distance ( Default: 0.05 )
+radiusDelta = 6E-5;     % Radial step size          ( Default: 6E-5 )
 
 %-------------------------------------------------------------------------------
 % Material parameters
@@ -215,7 +215,7 @@ absorbedRatio = 0.6;
 %   * Example: From a TiO2 target TiO and TiO2 can form during propagation,
 %       so nOxidesPerElement is 2.
 %   * Default: 2
-nOxidePerElement = 2;
+nOxidePerElement = 0;
 
 % Heat dissipating into the target per laser pulse [J]
 %   * Small for ceramic targets.
@@ -294,10 +294,8 @@ initVeloDistWidth = 1645;
 % Timer
 %-------------------------------------------------------------------------------
 
-if timerBool
-    % Time the entire script
-    durationTotalTimer = tic;
-end
+% Time the entire script
+durationTotalTimer = tic;
 
 % Initialize measured times
 %   * To prevent createConfigFile throwing an error.
@@ -463,7 +461,7 @@ iRadiusRange = 1 : nRadius;
 veloDelta = round( radiusDelta / timeDelta );
 
 % Initial velocity axis
-veloInit = round(0 : veloDelta : veloMaxInit);
+veloInit = round(0 : veloDelta : 10E4);
 
 %-------------------------------------------------------------------------------
 % Angular distribution
@@ -545,10 +543,17 @@ end
 %       threshold
 iVeloMax = find( any(nParticleVeloInit > nMin, 1) , 1, 'last');
 
-iVeloMaxAlt = round( ( veloInit(iVeloMax-1).*(mass(1) - max(mass(2:end))) + 2*max(mass(2:end))*veloInit(iVeloMax) ) ...
-                                ./ ( mass(1) + max(mass(2:end)) ) ./ veloDelta );
-                            
-return
+% Calculate the maximum achieved velocity after collision
+iVeloMaxAlt = round( ( veloInit(1).*(mass(1) - max(mass(2:end))) ...
+                       + 2*max(mass(2:end))*veloInit(iVeloMax) ) ...
+                     ./ ( mass(1) + max(mass(2:end)) ) ./ veloDelta );
+
+% If the maximum possible velocity after collision is higher than the previous
+%   obtained value
+if iVeloMaxAlt > iVeloMax
+    % Increase the maximum velocity
+    iVeloMax = iVeloMaxAlt;
+end
 
 % Velocity axis
 if negativeVeloBool
@@ -833,33 +838,37 @@ nPlasmaTemp = nPlasmaTemp - nCol;
 % Calculate new velocity after collision
 %-------------------------------------------------------------------------------
 
-iNewVelo = iVeloZero + round( ( velo(iVelo).*(mass(2:end) - mass(1)) + 2*mass(1)*velo(iVeloBG) ) ...
+% Calculate the new velocity of plasma particles after collision
+iNewVelo = iVeloZero + round( ( velo(iVelo).*(mass(2:end) - mass(1)) ...
+                                + 2*mass(1)*velo(iVeloBG) ) ...
                               ./ ( mass(2:end) + mass(1) ) ./ veloDelta );
-% iNewVelo(iNewVelo < 1) = 1;
-% iNewVelo(iNewVelo > nVelo) = nVelo;
 
-iNewVeloBG = iVeloZero + round( ( velo(iVeloBG).*(mass(1) - mass(2:end)) + 2*mass(2:end)*velo(iVelo) ) ...
+% Calculate the new velocity background gas particles after collision
+iNewVeloBG = iVeloZero + round( ( velo(iVeloBG).*(mass(1) - mass(2:end)) ...
+                                  + 2*mass(2:end)*velo(iVelo) ) ...
                                 ./ ( mass(1) + mass(2:end) ) ./ veloDelta );
-% iNewVeloBG(iNewVeloBG < 1) = 1;
-% iNewVeloBG(iNewVeloBG > nVelo) = nVelo;
 
-return
+% Prevent index out-of-range error
+iNewVelo(iNewVelo < 1) = 1;
+iNewVelo(iNewVelo > nVelo) = nVelo;
+iNewVeloBG(iNewVeloBG < 1) = 1;
+iNewVeloBG(iNewVeloBG > nVelo) = nVelo;
 
 %-------------------------------------------------------------------------------
 % Calculate new radial positions after collision
 %-------------------------------------------------------------------------------
 
 % New radial index of collided plasma particles
-nNewRadiusDelta = round( velo(iNewVeloMatrix(:, iVelo, iVeloBG)) ...
+nNewRadiusDelta = round( velo(iNewVelo) ...
                          .* (nRadiusDelta - jRadius) ...
                          ./ (nRadiusDelta * veloDelta) );
                        
 % New radial index of collided background particles
-nNewRadiusDeltaBG = round( velo(iNewVeloBGMatrix(:, iVelo, iVeloBG)) ...
+nNewRadiusDeltaBG = round( velo(iNewVeloBG) ...
                            .* (nRadiusDelta - jRadius) ...
                            ./ (nRadiusDelta * veloDelta) );
 
-% % Prevent index out-of-range error
+% Prevent index out-of-range error
 nNewRadiusDelta(thisRadius + nNewRadiusDelta < 1) = ...
     1 - thisRadius;
 nNewRadiusDeltaBG(thisRadius + nNewRadiusDeltaBG < 1) = ...
@@ -878,24 +887,29 @@ particleMatrix(2:end, :, iVelo, iRadius) = ...
     particleMatrix(2:end, :, iVelo, iRadius) - nCol;
 
 % Remove background particles from initial position before collision
+%   * The total number of collided particles get removed from the
+%       non-collided and collided background gas particles bins based on
+%       the ratio between non-collided and collided particles.
 particleMatrix(1, :, iVeloBG, thisRadius) = ...
     particleMatrix(1, :, iVeloBG, thisRadius) ...
     - ( particleMatrix(1, :, iVeloBG, thisRadius) ...
-    ./ sum(particleMatrix(1, :, iVeloBG, thisRadius), 2) ) * sum(nCol, 'all');
+        ./ sum(particleMatrix(1, :, iVeloBG, thisRadius), 2) ) ...
+      * sum(nCol, 'all');
 
 % Sum number of collisions over number of collisions per particle
 nColSum = sum(nCol, 2);
 
-for iSpecies = 1 : nSpecies - 1
+% Loop through plasma species
+for iSpecies = 2 : nSpecies
     % Add plasma particles to new position after collision
-    collisionMatrix(iSpecies+1, 1, iNewVeloMatrix(iSpecies, iVelo, iVeloBG), thisRadius + nNewRadiusDelta(iSpecies)) = ...
-        collisionMatrix(iSpecies+1, 1, iNewVeloMatrix(iSpecies, iVelo, iVeloBG), thisRadius + nNewRadiusDelta(iSpecies)) ...
-        + nColSum(iSpecies);
+    collisionMatrix(iSpecies, 1, iNewVelo(iSpecies-1), thisRadius + nNewRadiusDelta(iSpecies-1)) = ...
+        collisionMatrix(iSpecies, 1, iNewVelo(iSpecies-1), thisRadius + nNewRadiusDelta(iSpecies-1)) ...
+        + nColSum(iSpecies-1);
 
     % Add background particles to new position after collision
-    collisionMatrix(1, 1, iNewVeloBGMatrix(iSpecies, iVelo, iVeloBG), thisRadius + nNewRadiusDeltaBG(iSpecies)) = ...
-        collisionMatrix(1, 1, iNewVeloBGMatrix(iSpecies, iVelo, iVeloBG), thisRadius + nNewRadiusDeltaBG(iSpecies)) ...
-        + nColSum(iSpecies);
+    collisionMatrix(1, 1, iNewVeloBG(iSpecies-1), thisRadius + nNewRadiusDeltaBG(iSpecies-1)) = ...
+        collisionMatrix(1, 1, iNewVeloBG(iSpecies-1), thisRadius + nNewRadiusDeltaBG(iSpecies-1)) ...
+        + nColSum(iSpecies-1);
 end
 
 if debugBool
@@ -929,44 +943,51 @@ if (iAngle == 1) && ( sum(iTime == plotTimes) == 1 )
     
     % Loop through plasma species
     for iSpecies = 1 : nElements+1
-        figure(iSpecies);
-        fig = gcf;
+        % Initialize figure
+        fig = figure(iSpecies);
         
+        % Set figure name
         if iSpecies == 1
             fig.Name = 'Background propagation';
         else
             fig.Name = [atomUC(iSpecies-1).SYMBOL ' propagation'];
         end
         
+        % Select subplot
         subplot(1, numel(plotTimes), plotTimeIndex);
-        title([num2str(time(iTime), 3) ' s']);
         hold on;
+        
+        % Set title
+        title([num2str(time(iTime), 3) ' s']);
         
         % Initialize sum of all collisions array
         nParticleRadiusSum = zeros(1, nRadius);
         
+        % Loop through number of collisions
         for k = 1 : kMax+1
             % Calculate total number of particles per radial bin
             nParticleRadius = sum( squeeze( particleMatrix(iSpecies, k, :, :) ), 1 );
             
-%             if k == 1 && iSpecies ~= 1
-%                 % Total number of particles for this number of collisions
-%                 nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
-% 
-%                 % Fit a normalized Gaussian curve to the number of particles
-%                 nParticleRadius = fitGaussian( radius, nParticleRadius, nMin )';
-% 
-%                 % Multiply by number of particles
-%                 nParticleRadius = nParticleRadius .* nParticlePerK;
-%             else
-%                 % Smooth data
-%                 nParticleRadius = smoothdata( nParticleRadius, 2, 'gaussian', round(nRadius / 100) );
-%             end
+            % If non-collided and plasma species
+            if k == 1 && iSpecies ~= 1
+                % Total number of particles for this number of collisions
+                nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
+
+                % Fit a normalized Gaussian curve to the number of particles
+                nParticleRadius = fitGaussian( radius, nParticleRadius, nMin )';
+
+                % Multiply by number of particles
+                nParticleRadius = nParticleRadius .* nParticlePerK;
+            else
+                % Smooth data
+                nParticleRadius = smoothdata( nParticleRadius, 2, 'gaussian', round(nRadius / 100) );
+            end
             
             % Add to sum of all collisions array
             nParticleRadiusSum = nParticleRadiusSum + nParticleRadius;
             
-            if iSpecies == 1
+            % If background gas species and density plot is enabled
+            if (iSpecies == 1) && plotDensityBool
                 plot( radius, nParticleRadius ./ binVolume, ...
                       'Color', colorArray(k), ...
                       'LineWidth', 2, ...
@@ -976,12 +997,11 @@ if (iAngle == 1) && ( sum(iTime == plotTimes) == 1 )
                       'Color', colorArray(k), ...
                       'LineWidth', 2, ...
                       'DisplayName', plotArray{k} );
-                  
-%                 set(gca, 'YScale', 'log');
             end
-        end
+        end % Number of collisions loop
        
-        if iSpecies == 1
+        % If background gas species and density plot is enabled
+        if (iSpecies == 1) && plotDensityBool
             plot( radius, nParticleRadiusSum ./ binVolume, ...
                   'Color', colorArray(end), ...
                   'LineWidth', 2, ...
@@ -991,32 +1011,42 @@ if (iAngle == 1) && ( sum(iTime == plotTimes) == 1 )
                   'Color', colorArray(end), ...
                   'LineWidth', 2, ...
                   'DisplayName', plotArray{end} );
-              
-%             set(gca, 'YScale', 'log');
         end
-       
-        xlim([0 0.05]);
         
-%         if iSpecies == 1
-%             ylim([nMin 2E21]);
-%         else
-%             ylim([nMin 2E14]);
-%         end
+        % Set log-scale if selected
+        if plotLogBool
+            set(gca, 'YScale', 'log');
+        end
         
+        % For the first subplot
+        if plotTimeIndex == 1
+            % Set y-limit as maximal value in plot
+            ylimMax = max(nParticleRadiusSum);
+        end
+        
+        % Set y-limit of plot
+        if iSpecies == 1
+            ylim([nMinBG ylimMax]);
+        else
+            ylim([nMin ylimMax]);
+        end
+        
+        % Enable legend for last subplot
         if plotTimeIndex == numel(plotTimes)
             legend;
             legend('boxoff');
             legend('Location', 'northeast');
         end
-        
+
         hold off;
-    end
-end
+        
+    end % Species loop
+end % Time if
 
 % Show time
 disp(['Simulation time: ' num2str(time(iTime)) ' s (Execution time: ' num2str(toc(durationTotalTimer)) ' s)']);
 
-% Save execution time
+% Save execution times in array
 executionTime(iTime) = toc(durationTotalTimer);
 
 end % Time loop

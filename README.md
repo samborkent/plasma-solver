@@ -115,6 +115,11 @@ Validation
 
 # Change log
 
+09-06-21:
+* Determine maximum velocity based on maximal achievable background gas velocity
+    after collision with heavier particle.
+* Added some plotting options.
+
 08-06-21:
 * Cleaned up code
 * Added multiple distribution types to initialVelocityDistribution.
