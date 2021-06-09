@@ -115,6 +115,11 @@ Validation
 
 # Change log
 
+08-06-21:
+* Cleaned up code
+* Added multiple distribution types to initialVelocityDistribution.
+* Looked at performance issues.
+
 01-06-21:
 * Replaced log-normal distribution for Maxwell-Boltzmann distribution.
 
