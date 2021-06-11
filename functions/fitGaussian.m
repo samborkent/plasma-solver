@@ -15,7 +15,7 @@ xTemp = x(y > yThreshold);
 yTemp = y(y > yThreshold);
 
 % At least 6 points are required to fit a gaussian curve
-if numel(yTemp) > 6
+if numel(yTemp) >= 6
     % Fit a Gaussian curve
     fitGauss = fit( xTemp.', yTemp.', 'gauss2' );
 
@@ -23,13 +23,13 @@ if numel(yTemp) > 6
     curveGauss = feval( fitGauss, xTemp );
 
     % Interpolate the data to match the original x-axis
-    curveGauss = interp1( xTemp, curveGauss, x );
-
-    % Smooth data based on width of Gaussian curve
-    curveGauss = smooth( x, curveGauss, smoothValue*fitGauss.c1 );
-
+    curveGauss = interp1( xTemp, curveGauss, x, 'spline' );
+    
     % Remove data below the threshold
     curveGauss(curveGauss < yThreshold) = 0;
+
+%     % Smooth data based on width of Gaussian curve
+%     curveGauss = smooth( x, curveGauss, smoothValue*fitGauss.c1 );
 
     % Normalize
     curveGauss = curveGauss ./ sum(curveGauss);

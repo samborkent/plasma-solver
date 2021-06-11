@@ -116,7 +116,8 @@ if plotBool
     end
 
     % Initialize figure
-    figure(numel(atomUC)+2);
+    fig = figure(numel(atomUC)+2);
+    fig.Name = 'Initial velocity distribution';
     hold on;
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');
