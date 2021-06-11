@@ -12,8 +12,7 @@ to improve usability and performance and to support targets of any
 composition consisting of species of any mass.
 
 # Assumptions
-* The excitation energy of the atoms in the unit cell induced by the
-	ablation laser is neglected.
+
 * The laser spot is assumed to be square, resulting in a circular plasma
     cross-section.
 * The background gas starts out with zero velocity: the room temperature
@@ -25,9 +24,6 @@ composition consisting of species of any mass.
 * There is no net exchange of particles between angular bins: the number of
     particles entering and leaving each angular bin each time step is
     similar.
-* Particles can only gain positive momentum. When a light particle collides
-    with a heavier particle, its momentum is set to zero, and the heavy
-    particle gains a little momentum, so momentum is not conserved.
 * Collisions of species with the same mass are neglected, as for
     completely elastic collisions they would interchange velocities,
     resulting in no net change of density.
@@ -41,6 +37,7 @@ composition consisting of species of any mass.
     sufficient resolution)
 
 # Naming conventions
+
 Follow MATLAB style guidelines v1.3
 
 * bg      : Background
@@ -49,69 +46,34 @@ Follow MATLAB style guidelines v1.3
 * velo    : Velocity
 * uc      : Unit cell
 
-# Issues
-* When making complex composite targets, lithium gains too much energy.
-
 # To Do
 
-Main functionality
-* Counting the number of collisions per bin
-* Reproduce the Ti 1D propagation plot of the paper
-* 2D density plot
-* Collisions for two species
-* Collisions for light metals (Li)
-* Collisions for any number of species with any mass
-* Oxidation of plasma species
-* Collisions between unoxidized and oxidized species
-
 Physical improvements
-* Implement excitation energy in initialVelocityDistribution
-* Calculate heat dissipation into target
 * Include a temperature gradient origination from the heated substrate,
     resulting in a lower density and higher kinetic energy of background
     species near the substrate.
-* Improve the initial plasma particle distribution, so the middle of the
-    plume has the most particles.
 
 Additional features
-* Add correction to unit cell volume for non-right angles
-* Implement folder selection into initialVelocityDistribution save feature
 * Get materials data straight from P-Table and MaterialsProject websites
 * Atomatically determine non-ionized oxidation states in plasma plume
-* Adjust maximum velocity automatically based on the mean initial velocity
-    of the lowest mass species in the target
 * Add interpolation into velocity distribution for quick runs
 
-Clean-up
-* initialVelocityDistribution
-* Include plotting of 1D propagation in nParticlesPerRadius function
-* Make the plotting the separated collision propagation a function
-* Make calculate new velocity a function
-
 Performance
-* Replace all arrays with values in range 10^(+-38) with single-precision
-* Replace find with logical indexing where possible
+* Better factorize code
 * Replace division with multiplication where possible
 
-Validation
-* Which species form in plasma
-* Angular fitting parameter
-* Initial particle velocity distribution width
-* Ablation depth in target
-* Absorption coefficient (Temp and photon energy dependend)
-* Activation energies
-* Oxidation energies
-* Which data to print in config file
-* Formation energy of cubic spinel Li4Ti5O12 target
-
 # Differences with Wijnands's model
-* Background gas can have every velocity and can be completely modeled just
-    like plasma species.
+* Background gas can have every velocity and can be completely modeled
+    similar to plasma species.
 * Using double matrices for all data instead of struct, which improves
-    performance significantly.
-* The code was written to be general purpose, so should eventually work for
-    most materials, instead of specifically for TiO2.
-* Adjusted collision rate calculation, and included a velocity weight term.
+    performance and makes it easier to acces specific data.
+* The code was written to be general purpose, so works for most materials,
+    instead of only for TiO2.
+* Adjusted collision rate calculation, and included a velocity weight term,
+    so collisions with slower moving particles are more likely than
+    collisions with faster moving particles.
+* Implemented multiple initial velocity distributions, including a Maxwell-
+    Boltzmann distribution, which should be more physically accurate.
 
 # Change log
 
