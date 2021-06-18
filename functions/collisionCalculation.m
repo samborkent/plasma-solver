@@ -22,9 +22,21 @@ collisionRate = ( 1 ./ reshape(binVolume, 1, 1, 1, nRadius) ) ...
 % Matrix containing all possible velocity weights for collision calculation
 %   * Prevents having to calculate many times, instead just look up value
 %       from matrix
-veloWeight = abs( (velo' - velo) ./ (abs(velo') + abs(velo)) );
+veloWeight = (velo' - velo) ./ (velo' + velo);
 
-for iRadius = flip( iRadiusRange( any( particleMatrix(2:end, :, :, 1:end-1) > nMin, [1 2 3] ) ) )
+% If the background particle is moving towards the plasma particle,
+%   the velocity weight is one
+veloWeight(1:iVeloZero-1, iVeloZero+1:end) = 1;
+veloWeight(iVeloZero+1:end, 1:iVeloZero-1) = 1;
+
+% If the background gas particle if moving faster than the plasma particle,
+%   the velocity weight is zero
+veloWeight(veloWeight < 0) = 0;
+
+% Replace Nan with zero where both velocities are zero
+veloWeight(isnan(veloWeight)) = 0;
+
+for iRadius = flip( iRadiusRange( any( particleMatrix(2:end, :, :, :) > nMin, [1 2 3] ) ) )
 %% Calculations per radial bin
 % Loop backwards to prevent counting particles twice (flip)
 % Skip last bin as particles cannot move further (1:end-1)
