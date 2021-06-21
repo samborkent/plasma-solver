@@ -159,10 +159,8 @@ collisionBool = true;
 %   * Best way to improve performance
 %   * Don't increase the values too much, otherwise all particles will be skipped
 %   * Experiment to maximize performance / quality of results
-%   * nMinBG has te be smaller than or equal to nMin
 %   * Default: 1E6 (Limit seems to be ~1E8)
 nMin    = 1E5;     % Plasma threshold
-nMinBG  = 1E5;     % Background gas threshold
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
@@ -339,13 +337,6 @@ nLoops = 0;
 % Material calculations
 %-------------------------------------------------------------------------------
 
-% Throw error if number of background particle threshold is higher than
-%   number of plasma particles threshold.
-if nMinBG > (nMin + 1)
-    error(['Threshold for number of background particles should be lower or ' ...
-           'equal to the threshold for number of plasma particles.']);
-end
-
 % If target consists of only one unit cell
 if numel(uc) == 1
     % Set mixture ratio to 1
@@ -462,8 +453,8 @@ nUCAblated = (ablationVolume / sum([uc.VOLUME] .* ucRatio)) ...
 
 % Number of ablated atoms
 nAtomAblated = 0;
-for i = 1 : numel(uc)
-    nAtomAblated = nAtomAblated + nUCAblated(i) .* sum([uc(i).AMOUNT]);
+for iSpecies = 1 : numel(uc)
+    nAtomAblated = nAtomAblated + nUCAblated(iSpecies) .* sum([uc(iSpecies).AMOUNT]);
 end
 
 %-------------------------------------------------------------------------------
@@ -637,8 +628,6 @@ nBGTotal = sum( particleMatrix(1, 1, iVeloZero, :) );
 %-------------------------------------------------------------------------------
 
 % Fill into the plasma matrix
-% particleMatrix(2:nElements+1, 1, iVeloZero:end, 1) = ...
-%     reshape(nParticleVeloInit(:, 1:iVeloMax), nElements, 1, [], 1);
 for iVelo = 1 : iVeloMax-1
     particleMatrix(2:nElements+1, 1, iVeloZero+iVelo, iVelo) = nParticleVeloInit(:, iVelo+1);
 end
@@ -671,20 +660,24 @@ end
 %-------------------------------------------------------------------------------
 % Velocity smoothing
 %-------------------------------------------------------------------------------
+% Avoids zero velocity and smooth positive and negative velocities seperately,
+%   so no particles have their propagation direction reversed by smoothing,
+%   and no particles become static due to smoothing
 
-% Skip smoothing for the first time step as all velocity bins are filled
-if iTime > 1
-    if veloSmoothNonColBool
-        % Smooth velocities of non-collided particles
-        particleMatrix(2:end, 1, :, :) = ...
-            smoothdata( particleMatrix(2:end, 1, :, :), 3, 'gaussian', smoothWidth );
-    end
-    
-    if veloSmoothColBool
-        % Smooth velocities of collided particles
-        particleMatrix(:, 2:end, [1:iVeloZero-1 iVeloZero+1:end], :) = ...
-            smoothdata( particleMatrix(:, 2:end, [1:iVeloZero-1 iVeloZero+1:end], :), 3, 'gaussian', smoothWidth );
-    end
+if veloSmoothNonColBool
+    % Smooth velocities of non-collided particles
+    particleMatrix(2:end, 1, 1:iVeloZero-1, :) = ...
+        smoothdata( particleMatrix(2:end, 1, 1:iVeloZero-1, :), 3, 'gaussian', smoothWidth );
+    particleMatrix(2:end, 1, iVeloZero+1:nVelo, :) = ...
+        smoothdata( particleMatrix(2:end, 1, iVeloZero+1:nVelo, :), 3, 'gaussian', smoothWidth );
+end
+
+if veloSmoothColBool
+    % Smooth velocities of collided particles
+    particleMatrix(:, 2:end, 1:iVeloZero-1, :) = ...
+        smoothdata( particleMatrix(:, 2:end, 1:iVeloZero-1, :), 3, 'gaussian', smoothWidth );
+    particleMatrix(:, 2:end, iVeloZero+1:end, :) = ...
+        smoothdata( particleMatrix(:, 2:end, iVeloZero+1:end, :), 3, 'gaussian', smoothWidth );
 end
 
 %-------------------------------------------------------------------------------
@@ -692,14 +685,8 @@ end
 %   of particles
 %-------------------------------------------------------------------------------
 
-% Remove all background gas particles below threshold
-%   * nMinBG has to be lower than nMin
-particleMatrix(particleMatrix < nMinBG) = 0;
-
-% Remove all plasma particles below threshold
-tempMatrix = particleMatrix(2:end, :, :, :);
-tempMatrix(tempMatrix < nMin) = 0;
-particleMatrix(2:end, :, :, :) = tempMatrix;
+% Remove all particles below threshold
+particleMatrix(particleMatrix < nMin) = 0;
 
 % Normalize number of particles and add removed particles back to filled bins
 particleMatrix(1, :, :, :) = ( particleMatrix(1, :, :, :) ...
@@ -717,7 +704,7 @@ particleMatrix(2:end, :, :, :) = ( particleMatrix(2:end, :, :, :) ...
 if collisionBool
     % All collision calculation are performed here
     [particleMatrix, collisionMatrix, nLoops] = collisionCalculation( particleMatrix, ...
-        nLoops, nMin, nMinBG, iRadiusRange, radiusDelta, nRadius, velo, veloDelta, nVelo, ...
+        nLoops, nMin, nMin, iRadiusRange, radiusDelta, nRadius, velo, veloDelta, nVelo, ...
         iVeloRange, iVeloZero, binVolume, colCS, mass, nSpecies );
 end
 
@@ -781,14 +768,15 @@ if (iAngle == 1) && any(iTime == plotTimes)
                 else
             end
             
-            % If plot smoothing is enabled
-            if smoothPlotBool
+            % If plot smoothing is enabled and the density of the
+            %   background gas is not plotted
+            if smoothPlotBool && ~(plotDensityBool && (iSpecies == 1))
                 % Smooth data
-                nParticleRadius(2:nRadius-1) = ...
-                    smoothdata( nParticleRadius(2:nRadius-1), ...   % Data
-                                2, ...                              % Dimension
-                                'gaussian', ...                     % Type
-                                round(nRadius / 100) );             % Smoothing width
+                nParticleRadius = ...
+                    smoothdata( nParticleRadius, ...            % Data
+                                2, ...                          % Dimension
+                                'gaussian', ...                 % Type
+                                round(nRadius * radiusMax) );   % Smoothing width
             end
                 
             % Add to sum of all collisions array
@@ -839,9 +827,9 @@ if (iAngle == 1) && any(iTime == plotTimes)
         % Set y-limit of plot
         if iSpecies == 1
             if plotDensityBool
-                ylim([nMinBG ylimMaxBG]);
+                ylim([nMin ylimMaxBG]);
             else
-                ylim([nMinBG ylimMax]);
+                ylim([nMin ylimMax]);
             end
         else
             ylim([nMin ylimMax]);
@@ -864,15 +852,22 @@ end % Time if
 
 % [DEBUG]
 if debugBool
+    % Reduced particle 2D matrices per particle type
+    %   * Helpful for troubleshooting and to gain insight in particle propagation 
+    bgMatrix = squeeze(sum(particleMatrix(1, :, :, :), 2));
+    plasma1Matrix = squeeze(sum(particleMatrix(2, :, :, :), 2));
+    plasma2Matrix = squeeze(sum(particleMatrix(3, :, :, :), 2));
+    plasma3Matrix = squeeze(sum(particleMatrix(4, :, :, :), 2));
+    
     % Check for negative number of particles
-    if any( particleMatrix < -min([nMin nMinBG]), 'all')
+    if any( particleMatrix < -min([nMin nMin]), 'all')
         error('Negative number of particles detected.');
     end
     
     % If conservation of particle is enabled
     if keepParticleBool
         % Check if the total number of particles is conserved.
-        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > max([nMin nMinBG])
+        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > max([nMin nMin])
             error('The total number of particles is not conserved.');
         end
     end
@@ -921,7 +916,7 @@ end
 if createConfigBool
     createConfigFile( currentPath, folder, fileName, commentString, ... % File settings
         plotTimes, plotVeloDistBool, smoothPlotBool, plotDensityBool, plotLogBool, plot2DBool, saveFiguresBool, saveFormat, ... % Preferences
-        collisionBool, nMin, nMinBG, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
+        collisionBool, nMin, nMin, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
         time, angle, radius, velo, ... % Dimensional limits
         uc, ucRatio, atomUC, nAtomUC, nOxidePerElement, targetDensity, densityRatio, absorbedRatio, heatTarget, energyExcitation, ... % Material parameters
         bg, bgPressure, bgTemperature, bgDensity, ... % Background gas parameters

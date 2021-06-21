@@ -2,10 +2,10 @@ function particleMatrix = updateMatrix( particleMatrix, ...
                                         nVelo, iVeloZero, ...
                                         keepParticlesBool )
 %UPDATEMATRIX Update the non-colliding particle positions.
-%   If preserveParticlesBool is true, particles will remain in the last
+%   If keepParticlesBool is true, particles will remain in the last
 %   radial bin and the total number of particles in the particle matrix
 %   will be conserved. Has a significant hit on performance.
-%   If preserveParticlesBool is false, particles will disappear after
+%   If keepParticlesBool is false, particles will disappear after
 %   exceeding the first or last radial bin.
 
 for iVelo = nVelo : -1 : 1
