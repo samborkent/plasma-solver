@@ -161,14 +161,13 @@ collisionBool = false;
 %   * Experiment to maximize performance / quality of results
 %   * nMinBG has te be smaller than or equal to nMin
 %   * Default: 1E6 (Limit seems to be ~1E8)
-nMin    = 1E5;     % Plasma threshold
-nMinBG  = 1E5;     % Background gas threshold
+nMin    = 1;
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
 %   * Separating the plots into more different number of collisions is
 %       supported, but not implemented at this moment.
-kMax = 1;
+kMax = 0;
 
 % Allow negative velocities
 %   * Huge performance impact
@@ -181,12 +180,12 @@ negativeVeloBool = true;
 %   * Conserves number of particles
 %   * Best method for increasing the quality of results
 %   * Turn off for quick testing
-veloSmoothNonColBool = true;
+veloSmoothNonColBool = false;
 
 % Switch velocity smoothing for collided particles on or off (true / false)
 %   * Less visible effect on results
 %   * Huge impact on performance
-veloSmoothColBool = true;
+veloSmoothColBool = false;
 
 % Width of the Gaussian smoothing function for smoothing particle velocities
 %   * Default: 3 (corresponds to ~400 m/s with default resolution)
@@ -341,7 +340,7 @@ nLoops = 0;
 
 % Throw error if number of background particle threshold is higher than
 %   number of plasma particles threshold.
-if nMinBG > (nMin + 1)
+if nMin > (nMin + 1)
     error(['Threshold for number of background particles should be lower or ' ...
            'equal to the threshold for number of plasma particles.']);
 end
@@ -530,6 +529,9 @@ plotTimeIndex = 0;
 
 %% Main program
 
+% Number of loops counter
+NLoops = 0;
+
 for iAngle = 1 : nAngle
 %% Calculations per angle
 
@@ -701,7 +703,7 @@ end
 
 % Remove all background gas particles below threshold
 %   * nMinBG has to be lower than nMin
-particleMatrix(particleMatrix < nMinBG) = 0;
+particleMatrix(particleMatrix < nMin) = 0;
 
 % Remove all plasma particles below threshold
 tempMatrix = particleMatrix(2:end, :, :, :);
@@ -724,7 +726,7 @@ particleMatrix(2:end, :, :, :) = ( particleMatrix(2:end, :, :, :) ...
 if collisionBool
     % All collision calculation are performed here
     [particleMatrix, collisionMatrix, nLoops] = collisionCalculation( particleMatrix, ...
-        nLoops, nMin, nMinBG, iRadiusRange, radiusDelta, nRadius, velo, veloDelta, nVelo, ...
+        nLoops, nMin, nMin, iRadiusRange, radiusDelta, nRadius, velo, veloDelta, nVelo, ...
         iVeloRange, iVeloZero, binVolume, colCS, mass, nSpecies );
 end
 
@@ -732,354 +734,123 @@ end
 % New stuff
 %-------------------------------------------------------------------------------
 
-% Number of loops counter
-NLoops = 0;
-
-% Number of possible types of collisions
-N_C = 0;
-for jSpecies = 1 : nSpecies-1
-    N_C = N_C + (nSpecies - jSpecies);
-end
-
-% Initialize matrices
-% v_AB = zeros(N_C, nRadius); % Weighted average velocity of particles A and B
-% C_AB = zeros(N_C, nRadius); % Number of collisions between particles A and B
-% C_AB = zeros(1, nVelo); % Number of collisions between particles A and B
+% Initialize number of collisions matrix
+nCol = zeros(nSpecies, 1, nVelo, nRadius);
 
 % Radii of particles
 particleRadius = [sum([bg.RADIUS]) atomUC.RADIUS];
 
-subtractMatrixSum = 0;
-
-% Loop through radii
-for iRadius = flip( iRadiusRange( any( particleMatrix(2:end, :, :, :) > nMin, [1 2 3] ) ) )
-
-% Loop through distance traveled in one time step without collisions
-for nRadiusDelta = iVeloMax-1 : -1 : 1
+% For each possible particle speed
+for iSpeed = iVeloMax-1 : -1 : 1
     
-% Reset subtraction matrix for every velocity
-subtractMatrix = subtractMatrix.*0;
-
-% Propagation direction
-%   * Positive: propagation towards substrate
-%   * Negative: propagation towards target
-for dir = [1 -1]
-
-% Set velocity on propagation direction and radial bins traveled
-iVelo = nRadiusDelta * dir;
-
-% Type of collision index
-index = 0;
-
-% Loop through species from lightest to heaviest plasma particle
-for iSpecies = nSpecies : -1 : 2
+    % Reset number of collisions matrix
+    nCol = nCol .* 0;
     
-    % Skip loop if number of A particles is below threshold
-    if all( particleMatrix(iSpecies, :, iVeloZero+iVelo, iRadius) < nMin, 2 )
-        continue
-    end
+    % For each direction
+    for iDir = [1 -1]
 
-    % If the particle is moving forwards (towards substrate)
-    if dir == 1
-        % Set velocity range
-        veloRange = 1:iVeloZero+iVelo-1;
-
-        % Set radius range
-        if iRadius+iVelo-1 > nRadius
-            radiusRange = iRadius:nRadius;
-        else
-            radiusRange = iRadius:iRadius+iVelo-1;
-        end
-    % If the particle if moving backwards (towards target)
-    elseif dir == -1
-        % Set velocity range
-        veloRange = iVeloZero+iVelo+1:nVelo;
-
-        % Set radius range
-        if iRadius+iVelo+1 < 1
-            radiusRange = 1:iRadius;
-        else
-            radiusRange = iRadius+iVelo+1:iRadius;
-        end
-    end
-    
-    % Skip loop if all B particles are below threshold
-    if all( particleMatrix( 1:iSpecies-1, :, veloRange, radiusRange ) < nMin, 'all' )
-       continue
-    end
-    
-    % Get all filled radius indices
-    radiusRangeFull = radiusRange( sum(particleMatrix(1:iSpecies-1, :, veloRange, radiusRange), [1 2 3]) > nMin );
-
-    % Get all filled velocity indices
-    veloRangeFull = veloRange( sum(particleMatrix(1:iSpecies-1, :, veloRange, radiusRangeFull), [1 2 4]) > nMin );
-    
-    % Skip loop if ranges are empty
-    if isempty(radiusRangeFull) || isempty(veloRangeFull)
-        continue
-    end
-    
-    % Relative velocities
-    v_AB = abs( velo(iVeloZero+iVelo) - velo(veloRangeFull) );
-    
-    % Skip loop if relative velocity is smaller than the minimum non-zero velocity
-    if all(round( v_AB ./ veloDelta ) < 1, 'all')
-        continue
-    end
-    
-    % Velocity of particle A after collision
-    v_A = ( ( mass(iSpecies) - mass(1:iSpecies-1) ) * velo(iVeloZero+iVelo) ...
-            + 2 * mass(1:iSpecies-1) .* velo(veloRangeFull) ) ...
-          ./ ( mass(iSpecies) + mass(1:iSpecies-1) );
-
-    % Velocity of particles B after collision
-    v_B = ( ( mass(1:iSpecies-1) - mass(iSpecies) ) .* velo(veloRangeFull) ...
-            + 2 * mass(iSpecies) .* velo(iVeloZero+iVelo) ) ...
-          ./ ( mass(iSpecies) + mass(1:iSpecies-1) );
-      
-    % Velocity indices after collision
-    v_A = iVeloZero + round( v_A ./ veloDelta );
-    v_B = iVeloZero + round( v_B ./ veloDelta );
-    
-    % Prevent index out-of-bounds error
-    %   * The code should be written such that this error is impossible to occur
-    %   * So room for improvement here
-    v_A(v_A > nVelo) = nVelo;
-    v_A(v_A < 1) = 1;
-    v_B(v_B > nVelo) = nVelo;
-    v_B(v_B < 1) = 1;
-
-    v_A = reshape( v_A, numel(1:iSpecies-1), numel(veloRangeFull) );
-    v_B = reshape( v_B, numel(1:iSpecies-1), numel(veloRangeFull) );
-    
-    % Number of particles of type A and B
-    N_A = sum( particleMatrix(iSpecies, :, iVeloZero+iVelo, iRadius), 2 );
-    N_B = squeeze( sum( particleMatrix(1:iSpecies-1, :, veloRangeFull, radiusRangeFull), 2 ) );
-    
-    % Reshape so dimensions are correct
-    N_B = reshape( N_B, numel(1:iSpecies-1), numel(veloRangeFull), numel(radiusRangeFull) );
-
-    % Collisions cross-section of particles A and B
-    sigma_AB = pi .* (particleRadius(iSpecies) + particleRadius(1:iSpecies-1))'.^2;
-    
-    % Number of collisions between particles A and B within one time step
-%     C_AB = ( N_A .* N_B ./ reshape(binVolume(radiusRangeFull), 1, 1, numel(radiusRangeFull) ) ) ...
-%         .* sigma_AB .* timeDelta .* v_AB;
-    C_AB = ( N_A .* N_B ./ reshape(binVolume(radiusRangeFull), 1, 1, numel(radiusRangeFull) ) ) ...
-            .* sigma_AB .* timeDelta .* v_AB;
-    
-    % Remove value if number of collisions is below threshold
-    C_AB(C_AB < nMin) = 0;
-
-    % Skip loop if all number of collisions have been set to zero
-    if all(C_AB == 0, 'all')
-        continue
-    end
-
-    % Limit the number of collisions to the number of A particles
-    if sum(C_AB, 'all') > N_A
-        C_AB = ( C_AB ./ sum(C_AB, 'all') ) .* N_A;
-    end
-
-    % Limit the number of collisions to the number of B particles
-    C_AB( C_AB > N_B ) = N_B( C_AB > N_B );
-
-    % If there are non-collided A particles
-    if particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) >= nMin
+        % Velocity index
+        iVelo = iSpeed * iDir;
         
-        % If there are enough non-collided A particles
-        if particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) > sum(C_AB, 'all')
+        % For each plasma species
+        for iSpecies = nSpecies : -1 : 2
             
-            % Remove non-collided A particles
-            subtractMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) = ...
-                subtractMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) + sum(C_AB, 'all');
-
-        % If there are not enough non-collided A particles
-        else
-            % Remove remainder from collided A particles
-            subtractMatrix(iSpecies, 2, iVeloZero+iVelo, iRadius) = ...
-                subtractMatrix(iSpecies, 2, iVeloZero+iVelo, iRadius) ...
-                + sum(C_AB, 'all') ...
-                - particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius);
-            
-            % Remove all non-collided A particles
-            subtractMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) = ...
-                subtractMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) ...
-                + particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius);
-        end
-    % If there are no non-collided A particles left
-    else
-        % Remove all collisions from collided A particles
-         subtractMatrix(iSpecies, 2, iVeloZero+iVelo, iRadius) = ...
-             subtractMatrix(iSpecies, 2, iVeloZero+iVelo, iRadius) + sum(C_AB, 'all');
-    end
-    
-    % Temporary B particle matrix
-    bTemp = squeeze( particleMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) );
-    bTemp = reshape( bTemp, size(C_AB) );
-    cols1 = C_AB .* 0;
-    cols2 = C_AB .* 0;
-    
-    % If there are non-collided B particles left
-    if any( particleMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) >= nMin, 'all' )
-        
-        % If all non-collided bins have enough B particles
-        if all( bTemp >= C_AB, 'all' )
-            
-            % Remove non-collided B particles
-            subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) = ...
-                subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) ...
-                + reshape( C_AB, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );
-        
-        % If there are enough non-collided B particles
-        elseif any( bTemp >= C_AB, 'all' )
-            
-            % Collisions with non-collided B particles
-            cols1(bTemp >= C_AB) = C_AB(bTemp >= C_AB);
-            
-            % Collisions with collided B particles
-            cols2(bTemp < C_AB) = C_AB(bTemp < C_AB) - bTemp(bTemp < C_AB);
-                     
-            % Remove non-collided B particles
-            subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) = ...
-                subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) ...
-                + reshape( cols1, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );
-            
-            % Remove collided B particles
-            subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) = ...
-                subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) ...
-                + reshape( cols2, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );
-                     
-        % If there are not enough non-collided A particles
-        else
-
-            % Remove remainder from collided B particles
-            subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) = ...
-                subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) ...
-                + reshape( C_AB - bTemp, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );
-            
-            % Remove all non-collided B particles
-            subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) = ...
-                subtractMatrix(1:iSpecies-1, 1, veloRangeFull, radiusRangeFull) ...
-                + reshape( bTemp, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );        
-            
-        end
-    % If there are no non-collided B particles left
-    else
-        % Remove all collisions from collided B particles
-        subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) = ...
-            subtractMatrix(1:iSpecies-1, 2, veloRangeFull, radiusRangeFull) ...
-            + reshape( C_AB, numel(1:iSpecies-1), 1, numel(veloRangeFull), numel(radiusRangeFull) );
-    end
-    
-    % Scale the actually traveled distance by the difference in velocity
-    %   before and after collision
-    nRadiusTraveledA = iRadius + round( 0.5.*( velo(iVeloZero + iVelo) + velo(v_A) ) ./ veloDelta );
-    nRadiusTraveledA = reshape( nRadiusTraveledA, numel(1:iSpecies-1), numel(veloRangeFull) );
-    
-    % Limit to prevent index out-of-bounds error
-    nRadiusTraveledA(nRadiusTraveledA < 1) = 1;
-    nRadiusTraveledA(nRadiusTraveledA > nRadius) = nRadius;
-
-    nRadiusTraveledB = round( 0.5.*( velo(veloRangeFull) + velo(v_B) ) ./ veloDelta );
-    nRadiusTraveledB = reshape( nRadiusTraveledB, numel(1:iSpecies-1), numel(veloRangeFull) );
-    
-    C_AB_Sum = sum(C_AB, 3);
-
-    for jSpecies = 1 : iSpecies-1
-        
-        % Add collided A particles to collision matrix
-        collisionMatrix(iSpecies, 1, v_A(jSpecies, :), nRadiusTraveledA(jSpecies, :)) = ...
-            collisionMatrix(iSpecies, 1, v_A(jSpecies, :), nRadiusTraveledA(jSpecies, :)) ...
-            + reshape( C_AB_Sum(jSpecies, :), 1, 1, numel(veloRangeFull), 1);
-        
-        for jRadius = 1 : numel(radiusRangeFull)
-            % New position
-            nRadiusTraveledB = radiusRangeFull(jRadius) + nRadiusTraveledB;
-            
-            % Limit to prevent index out-of-bounds error
-            if keepParticleBool
-                nRadiusTraveledB(nRadiusTraveledB < 1) = 1;
-                nRadiusTraveledB(nRadiusTraveledB > nRadius) = nRadius;
-            else
-                nRadiusTraveledB(nRadiusTraveledB < 1) = 0;
-                nRadiusTraveledB(nRadiusTraveledB > nRadius) = 0;
-            end
+            % For each possible position 
+            for iRadius = nRadius : -1 : 1
                 
-            for jVelo = 1 : numel(veloRangeFull)
-                
-                if nRadiusTraveledB(jSpecies, jVelo) ~= 0
-                    % Add collided B particles to collision matrix
-                    collisionMatrix(jSpecies, 1, v_B(jSpecies, jVelo), nRadiusTraveledB(jSpecies, jVelo)) = ...
-                        collisionMatrix(jSpecies, 1, v_B(jSpecies, jVelo), nRadiusTraveledB(jSpecies, jVelo)) ...
-                        + C_AB(jSpecies, jVelo, jRadius);
+                % Skip radial bin if the number of A particles is below threshold
+                if particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius) < nMin
+                    continue
                 end
+                
+                % If the particle is moving forwards (towards substrate)
+                if iDir == 1
+                    % All velocities a particle at the current velocity can collide with
+                    iVeloCol = 1:iVeloZero+iVelo-1;
 
-                % Increment number of loops
+                    % The radial positions a particle with current velocity can collide
+                    %   with within one time step
+                    if iRadius+iVelo-1 > nRadius
+                        iRadiusCol = iRadius:nRadius;
+                    else
+                        iRadiusCol = iRadius:iRadius+iVelo-1;
+                    end
+                % If the particle if moving backwards (towards target)
+                elseif dir == -1
+                    % All velocities a particle at the current velocity can collide with
+                    iVeloCol = iVeloZero+iVelo+1:nVelo;
+
+                    % The radial positions a particle with current velocity can collide
+                    %   with within one time step
+                    if iRadius+iVelo+1 < 1
+                        iRadiusCol = 1:iRadius;
+                    else
+                        iRadiusCol = iRadius+iVelo+1:iRadius;
+                    end
+                end
+                
+                % Skip radial bin if all B particles it is possible to
+                %   collide with are below threahold
+                if all( particleMatrix(1:iSpecies-1, 1, iVeloCol, iRadiusCol) < nMin, 'all' )
+                    continue
+                end
+                
+                % Number of A particles
+                nA = particleMatrix(iSpecies, 1, iVeloZero+iVelo, iRadius);
+                
+                % Number of B particles
+                nB = particleMatrix(1:iSpecies-1, 1, iVeloCol, iRadiusCol);
+                
+                % Relative velocities between A and B particles
+                veloRelative = abs( velo(iVeloZero+iVelo) - velo(iVeloCol) );
+                
+                % Collisions cross-section of particles A and B
+                sigma_AB = pi .* (particleRadius(iSpecies) + particleRadius(1:iSpecies-1))'.^2;
+                
+                % Calculate the number of collisions within one timestep
+                nColTemp = (nA .* squeeze(nB) ) .* sigma_AB .* timeDelta .* veloRelative;
+                
+                % Sum of all collisions at this radius and velocity
+                nColSum = sum( nColTemp, 'all' );
+                
+                % Skip loop if number of collisions is below threshold
+                if nColSum < nMin
+                    continue
+                end
+                
+                % Add A particle collisions to number of collision matrix
+                nCol(iSpecies, 1, iVeloZero+iVelo, iRadius) = ...
+                    nCol(iSpecies, 1, iVeloZero+iVelo, iRadius) ...
+                    + nColSum;
+                
+                % Add B particle collisions to number of collisions matrix
+                nCol(1:iSpecies-1, 1, iVeloCol, iRadiusCol) = ...
+                     nCol(1:iSpecies-1, 1, iVeloCol, iRadiusCol) ...
+                     + reshape( nColTemp, [], 1, numel(iVeloCol), numel(iRadiusCol) );
+                
+                % Increment number of loops                                     
                 NLoops = NLoops + 1;
+                
+                return
+                
             end
+            
         end
     end
-    
-%     % Normalization factor
-%     norm = min([sum(subtractMatrix, 'all') sum(collisionMatrix, 'all')]);
-%     
-%     % Normalize matrices
-%     subtractMatrix = (subtractMatrix ./ sum(subtractMatrix, 'all')) .* norm;
-%     collisionMatrix = (collisionMatrix ./ sum(collisionMatrix, 'all')) .* norm;
-%     
-%     % Check if an equal about of particles get added and subtracted
-%     if abs( sum(subtractMatrix, 'all') - sum(collisionMatrix, 'all') ) > nMin
-%         error(['Unequal number of particles subtracted and added after collisions: ' ...
-%                num2str( sum(subtractMatrix, 'all'), 3 ) ' subtracted, ' ...
-%                num2str( sum(collisionMatrix, 'all'), 3 ) ' added, ' ...
-%                num2str( sum(subtractMatrix, 'all') - sum(collisionMatrix, 'all'), 3 ) ' difference.']);
-%     end
-
-end % For iSpecies
-
-end % For propagation direction
-
-% Limit the total amount of collisions by the total number of particles
-subtractMatrix(subtractMatrix > particleMatrix) = particleMatrix(subtractMatrix > particleMatrix);
-
-% Add the subtracted particles to the total number of subtracted particles
-subtractMatrixSum = subtractMatrixSum + sum( subtractMatrix, 'all' );
-
-% Subtract collided particles
-particleMatrix = particleMatrix - subtractMatrix;
-
-end % For nRadiusTraveled / iVelo
-
-end % For iRadius
-
-% % Limit the total amount of collisions by the total number of particles
-% subtractMatrix(subtractMatrix > particleMatrix) = particleMatrix(subtractMatrix > particleMatrix);
-
-% % Normalize the collision matrix
-% collisionMatrix = ( collisionMatrix ./ sum(collisionMatrix, 'all') ) ...
-%                   .* sum(subtractMatrix, 'all');
-              
-% Normalize the collision matrix
-collisionMatrix = ( collisionMatrix ./ sum(collisionMatrix, 'all') ) ...
-                  .* subtractMatrixSum;
+end
 
 %-------------------------------------------------------------------------------
 % Update non-collided particles
 %-------------------------------------------------------------------------------
 
-% % Subtract collided particles
-% particleMatrix = particleMatrix - subtractMatrix;
-% 
-% if any( particleMatrix < 0, 'all' )
-%     error('ERROR');
-% end
+% Subtract collided particles
+particleMatrix = particleMatrix - subtractMatrix;
 
 % Propagate non-collided particles
 particleMatrix = updateMatrix( particleMatrix, nVelo, iVeloZero, keepParticleBool );
 
 % Add collided particles back to particle matrix
-particleMatrix(:, 2, :, :) = particleMatrix(:, 2, :, :) + collisionMatrix;
+% particleMatrix(:, 2, :, :) = particleMatrix(:, 2, :, :) + collisionMatrix;
 
 %-------------------------------------------------------------------------------
 % Plot results
@@ -1118,18 +889,18 @@ if (iAngle == 1) && any(iTime == plotTimes)
             % Calculate total number of particles per radial bin
             nParticleRadius = sum( squeeze( particleMatrix(iSpecies, k, :, :) ), 1 );
             
-            % If non-collided and plasma species and velocity smoothing is off
-            if ~veloSmoothNonColBool && (k == 1) && (iSpecies ~= 1)
-                    % Total number of particles for this number of collisions
-                    nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
-
-                    % Fit a normalized Gaussian curve to the number of particles
-                    nParticleRadius = fitGaussian( radius, nParticleRadius, nMin );
-
-                    % Multiply by number of particles
-                    nParticleRadius = nParticleRadius .* nParticlePerK;
-                else
-            end
+%             % If non-collided and plasma species and velocity smoothing is off
+%             if ~veloSmoothNonColBool && (k == 1) && (iSpecies ~= 1)
+%                     % Total number of particles for this number of collisions
+%                     nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
+% 
+%                     % Fit a normalized Gaussian curve to the number of particles
+%                     nParticleRadius = fitGaussian( radius, nParticleRadius, nMin );
+% 
+%                     % Multiply by number of particles
+%                     nParticleRadius = nParticleRadius .* nParticlePerK;
+%                 else
+%             end
             
             % If plot smoothing is enabled and the density of the
             %   background gas is not plotted
@@ -1190,9 +961,9 @@ if (iAngle == 1) && any(iTime == plotTimes)
         % Set y-limit of plot
         if iSpecies == 1
             if plotDensityBool
-                ylim([nMinBG ylimMaxBG]);
+                ylim([nMin ylimMaxBG]);
             else
-                ylim([nMinBG ylimMax]);
+                ylim([nMin ylimMax]);
             end
         else
             ylim([nMin ylimMax]);
@@ -1223,14 +994,14 @@ if debugBool
     plasma3Matrix = squeeze(sum(particleMatrix(4, :, :, :), 2));
     
     % Check for negative number of particles
-    if any( particleMatrix < -min([nMin nMinBG]), 'all')
+    if any( particleMatrix < -min([nMin nMin]), 'all')
         error('Negative number of particles detected.');
     end
     
     % If conservation of particle is enabled
     if keepParticleBool
         % Check if the total number of particles is conserved.
-        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > max([nMin nMinBG])
+        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > max([nMin nMin])
             error('The total number of particles is not conserved.');
         end
     end
@@ -1248,7 +1019,8 @@ end % Angle loop
 
 % Calculate total number of collided and non-collided particles
 nNonColTotal = sum( particleMatrix(:, 1, :, :), 'all' );
-nColTotal = sum( particleMatrix(:, 2, :, :), 'all' );
+% nColTotal = sum( particleMatrix(:, 2, :, :), 'all' );
+nColTotal = 0;
 
 % Calculate the final plasma and background gas temperatures
 [plasmaTempEnd, bgTempEnd] = averageTemperature( particleMatrix, velo, mass );
@@ -1279,7 +1051,7 @@ end
 if createConfigBool
     createConfigFile( currentPath, folder, fileName, commentString, ... % File settings
         plotTimes, plotVeloDistBool, smoothPlotBool, plotDensityBool, plotLogBool, plot2DBool, saveFiguresBool, saveFormat, ... % Preferences
-        collisionBool, nMin, nMinBG, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
+        collisionBool, nMin, nMin, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
         time, angle, radius, velo, ... % Dimensional limits
         uc, ucRatio, atomUC, nAtomUC, nOxidePerElement, targetDensity, densityRatio, absorbedRatio, heatTarget, energyExcitation, ... % Material parameters
         bg, bgPressure, bgTemperature, bgDensity, ... % Background gas parameters
