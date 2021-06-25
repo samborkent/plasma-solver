@@ -62,8 +62,8 @@ for iUC = 1 : numel(uc)
             % Log-normal distribution variance
             sigma = sqrt( log( 1 + (initVeloDistWidth^2 / veloRMS^2) ) );
 
-            veloDistTemp = exp( -( log(velo(2:end)) - mu ).^2 ./ (2 * sigma^2) ) ...
-                ./ ( velo(2:end) .* (sqrt(2*pi) * sigma) );
+            veloDistTemp = [0 exp( -( log(velo(2:end)) - mu ).^2 ./ (2 * sigma^2) ) ...
+                ./ ( velo(2:end) .* (sqrt(2*pi) * sigma) )];
         end
 
         % Maxwell-Boltzmann distribution
@@ -88,9 +88,6 @@ nParticleVeloDist = ( nParticleVeloDist ./ sum(nParticleVeloDist, 'all') ) ...
 
 % If plotting is enabled
 if plotBool
-    
-    % Maximum required velocity
-    iVeloMax = find( any(nParticleVeloDist > nMin, 1) , 1, 'last');
     
     % String for material formula
     formulaString = [];
@@ -118,6 +115,7 @@ if plotBool
     % Initialize figure
     fig = figure(numel(atomUC)+2);
     fig.Name = 'Initial velocity distribution';
+    fig.Position = [250 100 528 378];
     hold on;
     xlabel('Velocity [m/s]');
     ylabel('Number of particles');
@@ -129,17 +127,28 @@ if plotBool
                 formulaString ]);
     end
     
+    % Higher resolution velocity axis
+    veloNew = linspace(min(velo), max(velo), 100*numel(velo));
+    
     % Loop through unique elements
     for iElement = 1 : numel(atomUC)
+        % Interpolate the data to match the original x-axis for higher reolution
+        %   plot
+        nParticleVeloDistNew = interp1( velo, nParticleVeloDist(iElement, :), veloNew, 'makima' );
+        
         % Plot result
-        plot(velo, nParticleVeloDist(iElement, :), ...
+        plot(veloNew, nParticleVeloDistNew, ...
              'LineWidth', 3, ...
              'DisplayName', atomUC(iElement).SYMBOL );
     end
     
+    % Find maximum velocity to plot
+    [~, iVeloLim] = find(nParticleVeloDist >= 0.001*max(nParticleVeloDist, [], 'all'), 1, 'last');
+    
     % Enable legend
     legend;
-    xlim([0 velo(iVeloMax)]);
+    xlim([0 velo(iVeloLim)]);
+    ylim([0 1.1*max(nParticleVeloDist, [], 'all')]);
 end
 
 end

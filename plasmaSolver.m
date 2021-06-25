@@ -48,6 +48,9 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% For best readability increasing the right-hand text limit and the comment
+%   formatting limit column widths to 80 is adviced.
+
 %% Initialization
 % Do not change!
 
@@ -90,18 +93,18 @@ fileName    = 'config';
 
 % Add comment to configuration file
 commentString = [ ' ' ...
-    'Li4Ti5O12 Target at 0.1 mbar' ...
+    'Try to match the measurements.' ...
     ];
 
 % Add label to saved figures
-figureLabel = 'LTO 0.1 mbar';
+figureLabel = 'TiO2 0.1mbar';
 
 %-------------------------------------------------------------------------------
 % Preferences
 %-------------------------------------------------------------------------------
 
 % Create a configuration file containing simulation settings
-createConfigBool = true;
+createConfigBool = false;
 
 % Enable / disable debug mode
 %   * Checks conservation of number of particles
@@ -112,17 +115,20 @@ debugBool = false;
 % Plot settings
 %-------------------------------------------------------------------------------
 
-% Indices of times to plot
-plotTimes = [6 16 31 51 81 100];
+% Times to plot [us]
+plotTimes = [1 2 3 6 9 12 15 18];
 
 % Plot the initial velocity distribution
 plotVeloDistBool = true;
+
+% Plot the propagation of particles
+plotResults = true;
 
 % Smooth plot results
 smoothPlotBool = true;
 
 % Plot density plot for background gas particles instead of number of particles
-plotDensityBool = true;
+plotDensityBool = false;
 
 % Plot figures in log scale
 plotLogBool = false;
@@ -134,11 +140,11 @@ plotLogBool = false;
 plot2DBool = false;
 
 % Save all open figures when simulation is finished
-saveFiguresBool = false;
+saveFiguresBool = true;
 
 % Format to save figures in
 %   * Ex.: '.fig', '.svg', '.png', etc.
-saveFormat = '.fig';
+saveFormat = {'.fig' '.svg'};
 
 %-------------------------------------------------------------------------------
 % Computational restrictions
@@ -157,10 +163,12 @@ collisionBool = true;
 
 % Minimal number of particles per bin
 %   * Best way to improve performance
-%   * Don't increase the values too much, otherwise all particles will be skipped
+%   * Increases quantization error
+%   * Don't increase the values too much, otherwise too many particle bins will
+%       be skipped.
 %   * Experiment to maximize performance / quality of results
-%   * Default: 1E6 (Limit seems to be ~1E8)
-nMin    = 1E5;     % Plasma threshold
+%   * Default: 1E5 / 1E6 (Limit seems to be ~1E8)
+nMin    = 1E7;     % Plasma threshold
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
@@ -184,7 +192,7 @@ veloSmoothNonColBool = true;
 % Switch velocity smoothing for collided particles on or off (true / false)
 %   * Less visible effect on results
 %   * Huge impact on performance
-veloSmoothColBool = false;
+veloSmoothColBool = true;
 
 % Width of the Gaussian smoothing function for smoothing particle velocities
 %   * Default: 3 (corresponds to ~400 m/s with default resolution)
@@ -202,7 +210,7 @@ keepParticleBool = false;
 %-------------------------------------------------------------------------------
 
 % Temporal limits [s]
-timeMax     = 10E-6;    % Simulation run time       ( Default: 5-20E-6 )
+timeMax     = 18E-6;    % Simulation run time        ( Default: 5-20E-6 )
 timeDelta   = 1E-7;     % Time step duration        ( Default: 1E-7    )
 
 % Angular limits [deg]
@@ -223,13 +231,13 @@ radiusDelta = 10E-5;     % Radial step size          ( Default: 4-6E-5 )
 %   * Preface with UC.
 %   * Any mixture of crystals is possible, eg. [UC.TiO2 UC.Li2O]
 %   * To add new materials or to view material propertie, see UnitCells.m
-%   Options: TiO2, SrTiO3, Li2O, LiO2, LiTi2O4, Li2TiO3, Li4Ti5O12
-uc = UC.Li4Ti5O12;
+%   Options: TiO2, SrTiO3, Li2O, LiO2, LiTi2O4, Li4Ti5O12
+uc = UC.TiO2;
 
 % Mixture ratio of species in target
 %   * Ignore if target contains only one component
 %   * Should be of same length as unit cell array
-ucRatio = [3 1];
+ucRatio = [1 2];
 
 % The number of oxides that can form per element
 %   * Example: From a TiO2 target TiO and TiO2 can form during propagation,
@@ -243,11 +251,11 @@ nOxidePerElement = 0;
 %   * Default: 0
 targetDensity = 0;
 
-% Ratio of laser energy that is absorbed by the target
+% Ratio of laser energy (248 nm) that is absorbed by the target
 %   * Determine per target for most accurate results
-%   * Default: 0.6
-% absorbedRatio = 0.77;
-absorbedRatio = 0.6;
+%   * TiO2: 0.66, SrTiO3: 0.77
+%   * Default: 0.7
+absorbedRatio = 0.7;
 
 % Heat dissipating into the target per laser pulse [J]
 %   * Small for ceramic targets.
@@ -269,7 +277,7 @@ bg = [PT.O PT.O];
 
 % Background gas pressure during depostion [Pa = 1E2 mbar]
 %   * Default: 0.01-0.2E2;
-bgPressure      = 0.02E2;
+bgPressure      = 0.1E2;
 
 % Temperature of background gas [K]
 %   * Default: 300
@@ -318,6 +326,13 @@ initVeloDistWidth = 1500;
 
 %% Calculations
 % Everything below is calculated automatically based on user input above.
+
+%-------------------------------------------------------------------------------
+% Times
+%-------------------------------------------------------------------------------
+
+% Convert to indices
+plotTimes = round( (plotTimes.*1E-6) ./ timeDelta );
 
 %-------------------------------------------------------------------------------
 % Timer
@@ -423,7 +438,7 @@ if (numel(metalUC) > 0) && sum([bg.NUMBER] == 8)
     end
 end
 
-% Calculate collisions cross-sections
+% Calculate the collision cross-sections
 colCS = (pi .* (sum([bg.RADIUS]) + colCS) .^2)';
 
 %-------------------------------------------------------------------------------
@@ -441,20 +456,27 @@ bgDensity = bgPressure / (C.BOLTZMANN * bgTemperature);
 ablationVolume  = spotWidth * spotHeight * ablationDepth;
 
 % Laser energy [J]
-energyLaser = (laserFluence * 10^4) * (spotWidth * spotHeight);
+%   * The 1E4 term convert cm^-2 to m^-2
+energyLaser = (laserFluence * 1E4) * (spotWidth * spotHeight);
 
 %-------------------------------------------------------------------------------
 % Atom calculations
 %-------------------------------------------------------------------------------
 
 % Number of ablated unit cells
+%   * Calculated as the ablation volume, divided by the weighted average of the
+%       unit cell volumes present in the target, multiplied by the density
+%       ratio.
 nUCAblated = (ablationVolume / sum([uc.VOLUME] .* ucRatio)) ...
              .* ucRatio .* densityRatio;
 
 % Number of ablated atoms
+%   * Calculated as the number of unit cells for each target component,
+%       multiplied by the number of atoms in that unit cell.
 nAtomAblated = 0;
 for iSpecies = 1 : numel(uc)
-    nAtomAblated = nAtomAblated + nUCAblated(iSpecies) .* sum([uc(iSpecies).AMOUNT]);
+    nAtomAblated = nAtomAblated ...
+        + nUCAblated(iSpecies) .* sum([uc(iSpecies).AMOUNT]);
 end
 
 %-------------------------------------------------------------------------------
@@ -472,20 +494,22 @@ else
 end
 
 % Temporal axis
-time    = 0 : timeDelta : timeMax - timeDelta;
-nTime   = numel(time);
+time    = timeDelta : timeDelta : timeMax;
+nTime   = numel(time);  % Number of time steps in the model
+
+% Array to store the execution time, can be plotted against the
 executionTime = zeros(1, nTime);
 
 % Radial axis
 radius  = 0 : radiusDelta : radiusMax - radiusDelta;
-nRadius = numel(radius);
+nRadius = numel(radius);    % Number of spatial steps in the model
 iRadiusRange = 1 : nRadius;
 
 % Velocity step size
 veloDelta = round( radiusDelta / timeDelta );
 
 % Initial velocity axis
-veloInit = round(0 : veloDelta : 10E4);
+veloInit = round(0 : veloDelta : 20E4);
 
 %-------------------------------------------------------------------------------
 % Angular distribution
@@ -497,24 +521,6 @@ nPlasmaAngle = angularDistribution( angle,        ...
                                     radiusDelta,  ...
                                     cosPowerFit,  ...
                                     nAtomAblated );
-                                  
-%-------------------------------------------------------------------------------
-% Plot settings
-%-------------------------------------------------------------------------------
-
-% Indices for number of collisions
-%   (1) : Non-collided
-%   (2) : Collided
-%   (3) : Sum
-
-% Array holding line colors for each number of collisions
-colorArray = ['b' 'r' 'k'];
-
-% Array holding display name for each number of collisions
-plotArray = {'Uncollided', 'Collided', 'Total'};
-
-% Figure index
-plotTimeIndex = 0;
 
 %% Main program
 
@@ -650,12 +656,9 @@ for iTime = 1 : nTime
 % Reset collision matrix each time step
 collisionMatrix = collisionMatrix.*0;
 
-% If number of particle is not conserved
-if ~keepParticleBool
-    % Recalculate number of particles each time step
-    nBGTotalNew = sum( particleMatrix(1, :, :, :), 'all' );
-    nPlasmaTotalNew = sum( particleMatrix(2:end, :, :, :), 'all' );
-end
+% Recalculate number of particles each time step
+nBGTotalNew = sum( particleMatrix(1, :, :, :), 'all' );
+nPlasmaTotalNew = sum( particleMatrix(2:end, :, :, :), 'all' );
 
 %-------------------------------------------------------------------------------
 % Velocity smoothing
@@ -722,135 +725,16 @@ particleMatrix(:, 2, :, :) = particleMatrix(:, 2, :, :) + collisionMatrix;
 % Plot results
 %-------------------------------------------------------------------------------
 
-% Only for specific times
-if (iAngle == 1) && any(iTime == plotTimes)
-    
-    % Increment figure index
-    plotTimeIndex = plotTimeIndex + 1;
-    
-    % Loop through plasma species
-    for iSpecies = 1 : nElements+1
-        % Initialize figure
-        fig = figure(iSpecies);
-        
-        % Set figure name
-        if iSpecies == 1
-            fig.Name = 'Background propagation';
-        else
-            fig.Name = [atomUC(iSpecies-1).SYMBOL ' propagation'];
-        end
-        
-        % Select subplot
-        subplot(1, numel(plotTimes), plotTimeIndex);
-        hold on;
-        
-        % Set title
-        title([num2str(time(iTime), 3) ' s']);
-        
-        % Initialize sum of all collisions array
-        nParticleRadiusSum = zeros(1, nRadius);
-        
-        % Loop through number of collisions
-        for k = 1 : kMax+1
-            % Calculate total number of particles per radial bin
-            nParticleRadius = sum( squeeze( particleMatrix(iSpecies, k, :, :) ), 1 );
-            
-            % If non-collided and plasma species and velocity smoothing is off
-            if ~veloSmoothNonColBool && (k == 1) && (iSpecies ~= 1)
-                    % Total number of particles for this number of collisions
-                    nParticlePerK = sum( particleMatrix(iSpecies, k, :, :), 'all' );
+% Only for the first angle
+if iAngle == 1 && plotResults
+    plotParticles( particleMatrix, plotTimes, iTime, time, atomUC, ...
+        nMin, radius, binVolume, smoothPlotBool, plotDensityBool, plotLogBool );
+end
 
-                    % Fit a normalized Gaussian curve to the number of particles
-                    nParticleRadius = fitGaussian( radius, nParticleRadius, nMin );
+%-------------------------------------------------------------------------------
+% DEBUG
+%-------------------------------------------------------------------------------
 
-                    % Multiply by number of particles
-                    nParticleRadius = nParticleRadius .* nParticlePerK;
-                else
-            end
-            
-            % If plot smoothing is enabled and the density of the
-            %   background gas is not plotted
-            if smoothPlotBool && ~(plotDensityBool && (iSpecies == 1))
-                % Smooth data
-                nParticleRadius = ...
-                    smoothdata( nParticleRadius, ...            % Data
-                                2, ...                          % Dimension
-                                'gaussian', ...                 % Type
-                                round(nRadius * radiusMax) );   % Smoothing width
-            end
-                
-            % Add to sum of all collisions array
-            nParticleRadiusSum = nParticleRadiusSum + nParticleRadius;
-            
-            % If background gas species and density plot is enabled
-            if (iSpecies == 1) && plotDensityBool
-                plot( radius, nParticleRadius ./ binVolume, ...
-                      'Color', colorArray(k), ...
-                      'LineWidth', 2, ...
-                      'DisplayName', plotArray{k} );
-            else
-                plot( radius, nParticleRadius, ...
-                      'Color', colorArray(k), ...
-                      'LineWidth', 2, ...
-                      'DisplayName', plotArray{k} );
-            end
-        end % Number of collisions loop
-       
-        % If background gas species and density plot is enabled
-        if (iSpecies == 1) && plotDensityBool
-            plot( radius, nParticleRadiusSum ./ binVolume, ...
-                  'Color', colorArray(end), ...
-                  'LineWidth', 2, ...
-                  'DisplayName', plotArray{end} );
-        else
-            plot( radius, nParticleRadiusSum, ...
-                  'Color', colorArray(end), ...
-                  'LineWidth', 2, ...
-                  'DisplayName', plotArray{end} );
-        end
-        
-        % Set log-scale if selected
-        if plotLogBool
-            set(gca, 'YScale', 'log');
-        end
-        
-        % For the first subplot
-        if plotTimeIndex == 1
-            % Set y-limit as maximal value in plot
-            if (iSpecies == 1) && plotDensityBool
-                ylimMaxBG = max(nParticleRadiusSum ./ binVolume);
-            else
-                ylimMax = max(nParticleRadiusSum);
-            end
-        end
-        
-        % Set y-limit of plot
-        if iSpecies == 1
-            if plotDensityBool
-                ylim([nMin ylimMaxBG]);
-            else
-                ylim([nMin ylimMax]);
-            end
-        else
-            ylim([nMin ylimMax]);
-        end
-        
-        % Set x-limit of plots
-        xlim([0 max(radius)]);
-        
-        % Enable legend for last subplot
-        if plotTimeIndex == numel(plotTimes)
-            legend;
-            legend('boxoff');
-            legend('Location', 'northeast');
-        end
-
-        hold off;
-        
-    end % Species loop
-end % Time if
-
-% [DEBUG]
 if debugBool
     % Reduced particle 2D matrices per particle type
     %   * Helpful for troubleshooting and to gain insight in particle propagation 
@@ -860,28 +744,36 @@ if debugBool
     plasma3Matrix = squeeze(sum(particleMatrix(4, :, :, :), 2));
     
     % Check for negative number of particles
-    if any( particleMatrix < -min([nMin nMin]), 'all')
+    if any( particleMatrix < -nMin, 'all')
         error('Negative number of particles detected.');
     end
     
     % If conservation of particle is enabled
     if keepParticleBool
         % Check if the total number of particles is conserved.
-        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > max([nMin nMin])
+        if abs( sum( particleMatrix, 'all' ) - nParticleTotal ) > nMin
             error('The total number of particles is not conserved.');
         end
     end
 end
 
+%-------------------------------------------------------------------------------
+% Excecution time
+%-------------------------------------------------------------------------------
+
 % Show time
 disp(['Simulation time: ' num2str(time(iTime)) ' s (Execution time: ' num2str(toc(durationTotalTimer)) ' s)']);
 
-% Save execution times in array
-executionTime(iTime) = toc(durationTotalTimer);
+if debugBool
+    % Save execution times in array
+    executionTime(iTime) = toc(durationTotalTimer);
+end
 
 end % Time loop
 
 end % Angle loop
+
+%% End calculations
 
 % Calculate total number of collided and non-collided particles
 nNonColTotal = sum( particleMatrix(:, 1, :, :), 'all' );
@@ -890,8 +782,20 @@ nColTotal = sum( particleMatrix(:, 2, :, :), 'all' );
 % Calculate the final plasma and background gas temperatures
 [plasmaTempEnd, bgTempEnd] = averageTemperature( particleMatrix, velo, mass );
 
+%-------------------------------------------------------------------------------
+% Excecution time
+%-------------------------------------------------------------------------------
+
 % Get total excecution time [s]
 durationTotal = toc(durationTotalTimer);
+
+% Plot the execution time versus the simulation time to visualize code performance.
+if debugBool
+    figure(nSpecies+2);
+    scatter(time, executionTime);
+    xlabel('Simulation time [s]');
+    ylabel('Execution time [s]');
+end
 
 %% Save all open figures
 
@@ -901,13 +805,25 @@ if saveFiguresBool
     
     % Loop through figures
     for iFig = 1 : numel(figArray)
-        % Save figure in results folder with figure name followed by date / time
-        savefig( figArray(iFig), ...
-                 [ currentPath '\' folder '\' ...
-                   get(figArray(iFig), 'Name') ' ' ...
-                   figureLabel ' ', ...
-                   datestr(now, 'yyyy-mm-dd HHMM') ...
-                   saveFormat ] );
+        for iFormat = 1 : numel(saveFormat)
+            % Save figure in results folder with figure name followed by
+            %   date and time
+            if strcmp( char( saveFormat(iFormat) ), '.fig' )
+                savefig( figArray(iFig), ...
+                         [ currentPath '\' folder '\' ...
+                           get(figArray(iFig), 'Name') ' ' ...
+                           figureLabel ' ', ...
+                           datestr(now, 'yyyy-mm-dd HHMM') ...
+                           char( saveFormat(iFormat) ) ] );
+            else
+                saveas( figArray(iFig), ...
+                         [ currentPath '\' folder '\' ...
+                           get(figArray(iFig), 'Name') ' ' ...
+                           figureLabel ' ', ...
+                           datestr(now, 'yyyy-mm-dd HHMM') ...
+                           char( saveFormat(iFormat) ) ] );
+            end
+        end
     end
 end
 
@@ -916,7 +832,7 @@ end
 if createConfigBool
     createConfigFile( currentPath, folder, fileName, commentString, ... % File settings
         plotTimes, plotVeloDistBool, smoothPlotBool, plotDensityBool, plotLogBool, plot2DBool, saveFiguresBool, saveFormat, ... % Preferences
-        collisionBool, nMin, nMin, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
+        collisionBool, nMin, kMax, negativeVeloBool, veloSmoothNonColBool, veloSmoothColBool, smoothWidth, keepParticleBool, ... % Computational restrictions
         time, angle, radius, velo, ... % Dimensional limits
         uc, ucRatio, atomUC, nAtomUC, nOxidePerElement, targetDensity, densityRatio, absorbedRatio, heatTarget, energyExcitation, ... % Material parameters
         bg, bgPressure, bgTemperature, bgDensity, ... % Background gas parameters

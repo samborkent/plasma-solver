@@ -39,11 +39,6 @@ if particleMatrix(iVelo, iRadius) > nMin
     
     % Restrict number of traveled bins to the total number of radial bins,
     %   to prevent index out-of-bounds error
-%     if ( iRadius + iVelo - 1 ) > nRadius
-%         nRadiusDelta = nRadius - iRadius;
-%     else
-%         nRadiusDelta = iVelo - 1;
-%     end
     if iVelo > iVeloZero
         if iRadius + iVelo > nRadius
             nRadiusDelta = nRadius - iRadius;

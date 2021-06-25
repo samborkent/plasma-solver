@@ -46,22 +46,6 @@ Follow MATLAB style guidelines v1.3
 * velo    : Velocity
 * uc      : Unit cell
 
-# To Do
-
-Physical improvements
-* Include a temperature gradient origination from the heated substrate,
-    resulting in a lower density and higher kinetic energy of background
-    species near the substrate.
-
-Additional features
-* Get materials data straight from P-Table and MaterialsProject websites
-* Atomatically determine non-ionized oxidation states in plasma plume
-* Add interpolation into velocity distribution for quick runs
-
-Performance
-* Better factorize code
-* Replace division with multiplication where possible
-
 # Differences with Wijnands's model
 * Background gas can have every velocity and can be completely modeled
     similar to plasma species.
@@ -76,6 +60,19 @@ Performance
     Boltzmann distribution, which should be more physically accurate.
 
 # Change log
+
+25-06-21:
+* Made some last adjustments, minor bug fixes, and added some additional bools for
+    convenience.
+* alternateSolver contains my first attempt at the proposed "all particle collisions" model.
+* Put all plot stuff in the function plotParticles as it should be.
+* Added reflection of particles arriving at the target surface, so they don't just phase
+    through the target somehow.
+* Found a bug prevalent at higher pressures where heavy particles somehow gain
+    negative velocity, and then don't reflect properly at the target surface. Propably a bug
+    in collisionCalculation for negative velocities due to how particle positions get updated.
+    Could also be the cause of the disproprtional performance impact of enabling
+    negative velocities.
 
 09-06-21:
 * Determine maximum velocity based on maximal achievable background gas velocity
