@@ -746,8 +746,8 @@ nColTotal = 0;
 % For each possible particle speed
 for iSpeed = iVeloMax-1 : -1 : 1
     
-%     % Reset number of collisions matrix
-%     nCol = nCol .* 0;
+    % Reset number of collisions matrix
+    nCol = nCol .* 0;
     
     % For each direction
     for iDir = [1 -1]

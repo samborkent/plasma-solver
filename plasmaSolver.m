@@ -93,18 +93,18 @@ fileName    = 'config';
 
 % Add comment to configuration file
 commentString = [ ' ' ...
-    'Try to match the measurements.' ...
+    'Code demonstration' ...
     ];
 
 % Add label to saved figures
-figureLabel = 'TiO2 0.1mbar';
+figureLabel = 'TiO2 SrTiO3 0.02mbar';
 
 %-------------------------------------------------------------------------------
 % Preferences
 %-------------------------------------------------------------------------------
 
 % Create a configuration file containing simulation settings
-createConfigBool = false;
+createConfigBool = true;
 
 % Enable / disable debug mode
 %   * Checks conservation of number of particles
@@ -116,7 +116,7 @@ debugBool = false;
 %-------------------------------------------------------------------------------
 
 % Times to plot [us]
-plotTimes = [1 2 3 6 9 12 15 18];
+plotTimes = [0.5 1.5 3 6 9];
 
 % Plot the initial velocity distribution
 plotVeloDistBool = true;
@@ -168,7 +168,7 @@ collisionBool = true;
 %       be skipped.
 %   * Experiment to maximize performance / quality of results
 %   * Default: 1E5 / 1E6 (Limit seems to be ~1E8)
-nMin    = 1E7;     % Plasma threshold
+nMin    = 1E9;     % Plasma threshold
 
 % Maximum number of collisions
 %   * Currently only non-collided (k=0) and collided (k=1) results get plotted
@@ -210,7 +210,7 @@ keepParticleBool = false;
 %-------------------------------------------------------------------------------
 
 % Temporal limits [s]
-timeMax     = 18E-6;    % Simulation run time        ( Default: 5-20E-6 )
+timeMax     = 7E-6;    % Simulation run time        ( Default: 5-20E-6 )
 timeDelta   = 1E-7;     % Time step duration        ( Default: 1E-7    )
 
 % Angular limits [deg]
@@ -231,8 +231,8 @@ radiusDelta = 10E-5;     % Radial step size          ( Default: 4-6E-5 )
 %   * Preface with UC.
 %   * Any mixture of crystals is possible, eg. [UC.TiO2 UC.Li2O]
 %   * To add new materials or to view material propertie, see UnitCells.m
-%   Options: TiO2, SrTiO3, Li2O, LiO2, LiTi2O4, Li4Ti5O12
-uc = UC.TiO2;
+%   Options: TiO2, SrTiO3, LiTi2O4, Li4Ti5O12, etc.
+uc = [UC.TiO2 UC.SrTiO3];
 
 % Mixture ratio of species in target
 %   * Ignore if target contains only one component
@@ -277,7 +277,7 @@ bg = [PT.O PT.O];
 
 % Background gas pressure during depostion [Pa = 1E2 mbar]
 %   * Default: 0.01-0.2E2;
-bgPressure      = 0.1E2;
+bgPressure      = 0.02E2;
 
 % Temperature of background gas [K]
 %   * Default: 300
